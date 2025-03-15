@@ -39,6 +39,17 @@ include = [
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.hatch.envs.test]
+dependencies = [
+    "pytest>=8.3.5",
+    "pytest-cov>=4.1.0",
+    "pytest-watch>=4.2.0",
+]
+
+[tool.hatch.envs.test.scripts]
+test = "pytest {args}"
+watch = "ptw {args}"
+
 [tool.mypy]
 python_version = "3.12"
 warn_return_any = true
@@ -86,5 +97,6 @@ known-first-party = ["testgenesis_dsl", "testgenesis_cli"]
 dev = [
     "mypy>=1.14.1",
     "pytest>=8.3.5",
+    "pytest-watch>=4.2.0",
     "ruff>=0.11.0",
 ]
