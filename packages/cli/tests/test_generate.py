@@ -3,7 +3,8 @@
 import json
 from pathlib import Path
 import pytest
-from click.testing import CliRunner
+from click.testing import CliRunner, Result
+from typing import Generator
 
 from testgenesis_cli.commands.generate import generate
 
@@ -28,6 +29,95 @@ def sample_flow_file(tmp_path):
     flow_file = tmp_path / "login_flow.json"
     flow_file.write_text(json.dumps(flow_data))
     return flow_file
+
+
+@pytest.fixture
+def runner() -> CliRunner:
+    """Create a CLI test runner."""
+    return CliRunner()
+
+
+@pytest.fixture
+def test_flow(tmp_path: Path) -> Generator[Path, None, None]:
+    """Create a test flow file for testing."""
+    flow_path = tmp_path / "test_flow.json"
+    flow_path.write_text("""
+    {
+        "name": "test_login",
+        "actions": [
+            {
+                "type": "navigation",
+                "target": "/login",
+                "assertions": ["url"]
+            },
+            {
+                "type": "form",
+                "target": "#login-form",
+                "data": {
+                    "#email": "test@example.com",
+                    "#password": "password123"
+                },
+                "assertions": ["form_valid"]
+            }
+        ]
+    }
+    """)
+    yield flow_path
+
+
+def test_generate_playwright(runner: CliRunner, test_flow: Path, tmp_path: Path) -> None:
+    """Test generating a Playwright test."""
+    output_path = tmp_path / "test.spec.ts"
+    result = runner.invoke(
+        generate, [str(test_flow), "--framework", "playwright", "--output", str(output_path)]
+    )
+
+    assert result.exit_code == 0
+    assert output_path.exists()
+    assert "test_login" in output_path.read_text()
+    assert "@playwright/test" in output_path.read_text()
+
+
+def test_generate_cypress(runner: CliRunner, test_flow: Path, tmp_path: Path) -> None:
+    """Test generating a Cypress test."""
+    output_path = tmp_path / "test.cy.ts"
+    result = runner.invoke(
+        generate, [str(test_flow), "--framework", "cypress", "--output", str(output_path)]
+    )
+
+    assert result.exit_code == 0
+    assert output_path.exists()
+    assert "test_login" in output_path.read_text()
+    assert "describe(" in output_path.read_text()
+
+
+def test_generate_invalid_framework(runner: CliRunner, test_flow: Path, tmp_path: Path) -> None:
+    """Test generating with an invalid framework."""
+    output_path = tmp_path / "test.ts"
+    result = runner.invoke(
+        generate, [str(test_flow), "--framework", "invalid", "--output", str(output_path)]
+    )
+
+    assert result.exit_code != 0
+    assert not output_path.exists()
+
+
+def test_generate_missing_flow(runner: CliRunner, tmp_path: Path) -> None:
+    """Test generating with a missing flow file."""
+    output_path = tmp_path / "test.ts"
+    result = runner.invoke(
+        generate,
+        [
+            str(tmp_path / "nonexistent.json"),
+            "--framework",
+            "playwright",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert not output_path.exists()
 
 
 def test_generate_playwright_test(sample_flow_file, tmp_path):

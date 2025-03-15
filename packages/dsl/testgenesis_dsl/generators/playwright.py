@@ -1,45 +1,47 @@
 """Playwright test code generator."""
 
-from ..models.test_flow import UserAction, TestFlow
+from pathlib import Path
+from typing import Any, Dict
+
+import json
+
+from ..models.test_flow import TestFlow
 
 
-def generate_action(action: UserAction) -> str:
-    """Generate Playwright code for a user action."""
-    code = []
+def generate_playwright_test(flow_path: str, output_path: str) -> None:
+    """Generate a Playwright test from a test flow."""
+    # Load test flow
+    flow_data = json.loads(Path(flow_path).read_text())
+    flow = TestFlow(name=flow_data["name"], actions=flow_data["actions"])
 
-    if action.wait_for:
-        code.append(
-            f"await page.waitForSelector('{action.wait_for}', {{ timeout: {action.timeout} }})"
-        )
+    # Generate test code
+    code = f"""
+import {{ test, expect }} from '@playwright/test';
 
-    if action.type == "navigation":
-        code.append(f"await page.goto('{action.target}')")
-        if "url" in action.assertions:
-            code.append(f"expect(page.url()).toContain('{action.target}')")
-        if "title" in action.assertions:
-            code.append("await expect(page).toHaveTitle(/.*/)")
+test('{flow.name}', async ({{ page }}) => {{
+"""
 
-    elif action.type == "click":
-        code.append(f"await page.click('{action.target}')")
-
-    elif action.type == "form":
-        for field, value in action.data.items():
-            code.append(f"await page.fill('{action.target} [name=\"{field}\"]', '{value}')")
-        code.append(f"await page.click('{action.target} [type=\"submit\"]')")
-
-    return "\n".join(code)
-
-
-def generate_test(flow: TestFlow) -> str:
-    """Generate a complete Playwright test file."""
-    code = [
-        "import { test, expect } from '@playwright/test';",
-        "",
-        f"test('{flow.name}', async ({page}) => {{",
-    ]
-
+    # Add actions
     for action in flow.actions:
-        code.extend(f"  {line}" for line in generate_action(action).split("\n"))
+        if action.type == "navigation":
+            code += f"    await page.goto('{action.target}');\n"
+            if action.assertions:
+                code += f"    await expect(page).toHaveURL('{action.target}');\n"
 
-    code.append("});")
-    return "\n".join(code)
+        elif action.type == "click":
+            code += f"    await page.click('{action.target}');\n"
+            if action.assertions:
+                code += f"    await expect(page.locator('{action.target}')).toBeVisible();\n"
+
+        elif action.type == "form":
+            if action.data:
+                for selector, value in action.data.items():
+                    code += f"    await page.fill('{selector}', '{value}');\n"
+            code += f"    await page.click('{action.target}');\n"
+            if action.assertions:
+                code += "    // Add form validation assertions here\n"
+
+    code += "});\n"
+
+    # Save test file
+    Path(output_path).write_text(code)

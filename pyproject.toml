@@ -5,8 +5,13 @@ description = "TestGenesis - Generate E2E tests from user analytics data"
 authors = [
     { name = "TestGenesis Team" }
 ]
-requires-python = ">=3.8"
-dependencies = []
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.0.0",
+    "types-click",
+    "rich>=13.0.0",
+    "amplitude-analytics>=1.1.0",
+]
 optional-dependencies = {dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.1.0",
@@ -27,16 +32,41 @@ packages = [
     "packages/dsl",
     "packages/cli"
 ]
+include = [
+    "packages/*/py.typed",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+mypy_path = ["packages/cli", "packages/dsl"]
+exclude = ["tests"]
+
+[[tool.mypy.overrides]]
+module = ["amplitude.*"]
+ignore_missing_imports = true
 
 [tool.ruff]
 # Enable ruff formatter
 include = ["*.py"]
 line-length = 100
-target-version = "py38"
+target-version = "py312"
 
+[tool.ruff.lint]
 # Enable rules
 select = [
     "E",   # pycodestyle errors
@@ -49,11 +79,12 @@ select = [
     "RUF", # ruff-specific rules
 ]
 
-# Configure isort rules
-[tool.ruff.isort]
-known-first-party = ["testgenesis_dsl", "testgenesis_cli"] 
+[tool.ruff.lint.isort]
+known-first-party = ["testgenesis_dsl", "testgenesis_cli"]
 
 [dependency-groups]
 dev = [
+    "mypy>=1.14.1",
+    "pytest>=8.3.5",
     "ruff>=0.11.0",
 ]

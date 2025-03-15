@@ -1,42 +1,46 @@
 """Cypress test code generator."""
 
-from ..models.test_flow import UserAction, TestFlow
+from pathlib import Path
+from typing import Any, Dict
+
+import json
+
+from ..models.test_flow import TestFlow
 
 
-def generate_action(action: UserAction) -> str:
-    """Generate Cypress code for a user action."""
-    code = []
+def generate_cypress_test(flow_path: str, output_path: str) -> None:
+    """Generate a Cypress test from a test flow."""
+    # Load test flow
+    flow_data = json.loads(Path(flow_path).read_text())
+    flow = TestFlow(name=flow_data["name"], actions=flow_data["actions"])
 
-    if action.wait_for:
-        code.append(f"cy.get('{action.wait_for}', {{ timeout: {action.timeout} }})")
+    # Generate test code
+    code = f"""
+describe('{flow.name}', () => {{
+  it('completes successfully', () => {{
+"""
 
-    if action.type == "navigation":
-        code.append(f"cy.visit('{action.target}')")
-        if "url" in action.assertions:
-            code.append(f"cy.url().should('include', '{action.target}')")
-        if "title" in action.assertions:
-            code.append("cy.title().should('match', /.*/)")
-
-    elif action.type == "click":
-        code.append(f"cy.get('{action.target}').click()")
-
-    elif action.type == "form":
-        for field, value in action.data.items():
-            code.append(f"cy.get('{action.target} [name=\"{field}\"]').type('{value}')")
-        code.append(f"cy.get('{action.target} [type=\"submit\"]').click()")
-
-    return "\n".join(code)
-
-
-def generate_test(flow: TestFlow) -> str:
-    """Generate a complete Cypress test file."""
-    code = [
-        f"describe('{flow.name}', () => {{",
-        "  it('completes successfully', () => {",
-    ]
-
+    # Add actions
     for action in flow.actions:
-        code.extend(f"    {line}" for line in generate_action(action).split("\n"))
+        if action.type == "navigation":
+            code += f"    cy.visit('{action.target}');\n"
+            if action.assertions:
+                code += f"    cy.url().should('include', '{action.target}');\n"
 
-    code.extend(["  })", "})"])
-    return "\n".join(code)
+        elif action.type == "click":
+            code += f"    cy.get('{action.target}').click();\n"
+            if action.assertions:
+                code += f"    cy.get('{action.target}').should('be.visible');\n"
+
+        elif action.type == "form":
+            if action.data:
+                for selector, value in action.data.items():
+                    code += f"    cy.get('{selector}').type('{value}');\n"
+            code += f"    cy.get('{action.target}').click();\n"
+            if action.assertions:
+                code += "    // Add form validation assertions here\n"
+
+    code += "  });\n});\n"
+
+    # Save test file
+    Path(output_path).write_text(code)

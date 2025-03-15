@@ -1,14 +1,16 @@
 """TestGenesis CLI main entry point."""
 
+from typing import NoReturn
+
 import click
 
-from ..analytics.amplitude import amplitude
-from .generate import generate
+from testgenesis_cli.analytics.amplitude import amplitude
+from testgenesis_cli.commands.generate import generate
 
 
 @click.group()
-def cli():
-    """TestGenesis CLI tools."""
+def cli() -> None:
+    """TestGenesis CLI - Generate E2E tests from analytics data."""
     pass
 
 
