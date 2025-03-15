@@ -21,11 +21,24 @@ def create_test_flow(events: List[BaseEvent], name: str) -> TestFlow:
     """Create a test flow from a sequence of Amplitude events."""
     actions: List[Action] = []
     for event in events:
-        action = Action(
-            type=event.event_type,
-            target=event.event_properties.get("target", ""),
-            data=event.event_properties,
-        )
+        if event.event_type == "navigation":
+            action = Action(
+                type=event.event_type,
+                target=event.event_properties.get("path", ""),
+                data=event.event_properties,
+            )
+        elif event.event_type == "form":
+            action = Action(
+                type=event.event_type,
+                target=event.event_properties.get("target", ""),
+                data=event.event_properties.get("data", {}),
+            )
+        else:
+            action = Action(
+                type=event.event_type,
+                target=event.event_properties.get("target", ""),
+                data=event.event_properties,
+            )
         actions.append(action)
 
     return TestFlow(name=name, actions=actions)

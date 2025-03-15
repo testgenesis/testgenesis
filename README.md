@@ -144,3 +144,36 @@ testgenesis amplitude extract-flows \
 testgenesis generate test_flows/user_journey_123.json \
   --framework playwright \
   --output tests/e2e/login_flow.spec.ts
+```
+
+## Development
+
+### Setup
+
+1. Install Python 3.12 or higher
+2. Install `uv` for package management
+3. Create and activate a virtual environment
+4. Install dependencies: `uv pip install -e ".[dev]"`
+
+### Running Tests
+
+Use `hatch` to run tests:
+
+```bash
+# Run tests for CLI package
+hatch run test:test packages/cli/tests -v
+
+# Run tests for DSL package
+hatch run test:test packages/dsl/tests -v
+
+# Run all tests
+hatch run test:test -v
+
+# Watch mode for CLI tests
+hatch run test:watch packages/cli/tests -v
+
+# Watch mode for DSL tests
+hatch run test:watch packages/dsl/tests -v
+```
+
+The test configuration is managed in the root `pyproject.toml` under the `[tool.hatch.envs.test]` section.

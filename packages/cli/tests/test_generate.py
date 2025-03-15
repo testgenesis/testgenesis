@@ -129,6 +129,9 @@ def test_generate_playwright_test(sample_flow_file, tmp_path):
         generate, [str(sample_flow_file), "--framework", "playwright", "--output", str(output_file)]
     )
 
+    if result.exit_code != 0:
+        print(f"\nCommand failed with output:\n{result.output}")
+
     assert result.exit_code == 0
     assert output_file.exists()
 

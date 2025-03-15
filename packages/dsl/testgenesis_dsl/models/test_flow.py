@@ -23,6 +23,7 @@ class TestFlow:
     actions: List[Action]
     description: Optional[str] = None
     tags: List[str] = field(default_factory=list)
+    frequency: int = 1
 
     def get_pattern(self) -> str:
         """Get a string representation of the action pattern for comparison."""
@@ -34,12 +35,13 @@ class TestFlow:
 
         data = {
             "name": self.name,
+            "frequency": self.frequency,
             "actions": [
                 {
                     "type": action.type,
                     "target": action.target,
-                    "data": action.data,
-                    "assertions": action.assertions,
+                    **({"data": action.data} if action.data is not None else {}),
+                    **({"assertions": action.assertions} if action.assertions is not None else {}),
                 }
                 for action in self.actions
             ],
