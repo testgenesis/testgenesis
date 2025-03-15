@@ -17,4 +17,4 @@ cli.add_command(generate)
 
 
 if __name__ == "__main__":
-    cli() 
+    cli()

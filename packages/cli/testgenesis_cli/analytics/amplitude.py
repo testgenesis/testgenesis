@@ -19,7 +19,7 @@ console = Console()
 def create_test_flow(events: list[BaseEvent]) -> TestFlow:
     """Convert Amplitude events into a TestGenesis test flow."""
     actions = []
-    
+
     for event in events:
         # Convert Amplitude event properties to test actions
         if event.event_type == "page_view":
@@ -27,7 +27,7 @@ def create_test_flow(events: list[BaseEvent]) -> TestFlow:
                 UserAction(
                     type="navigation",
                     target=event.event_properties.get("path", "/"),
-                    assertions=["url", "title"]
+                    assertions=["url", "title"],
                 )
             )
         elif event.event_type == "click":
@@ -35,7 +35,7 @@ def create_test_flow(events: list[BaseEvent]) -> TestFlow:
                 UserAction(
                     type="click",
                     target=event.event_properties.get("element_selector"),
-                    assertions=["element_visible", "element_enabled"]
+                    assertions=["element_visible", "element_enabled"],
                 )
             )
         elif event.event_type == "form_submit":
@@ -44,14 +44,11 @@ def create_test_flow(events: list[BaseEvent]) -> TestFlow:
                     type="form",
                     target=event.event_properties.get("form_selector"),
                     data=event.event_properties.get("form_data", {}),
-                    assertions=["form_valid", "submit_success"]
+                    assertions=["form_valid", "submit_success"],
                 )
             )
-    
-    return TestFlow(
-        name=f"user_journey_{events[0].user_id}",
-        actions=actions
-    )
+
+    return TestFlow(name=f"user_journey_{events[0].user_id}", actions=actions)
 
 
 @click.group()
@@ -101,13 +98,13 @@ def extract_flows(
     try:
         # Initialize Amplitude client
         client = Amplitude(api_key)
-        
+
         # Fetch events
         events = client.export_events(
             start_time=start_date,
             end_time=end_date,
         )
-        
+
         # Group events by user session
         sessions = {}
         for event in events:
@@ -115,13 +112,13 @@ def extract_flows(
             if session_id not in sessions:
                 sessions[session_id] = []
             sessions[session_id].append(event)
-        
+
         # Convert sessions to test flows
         flows = []
         for session_events in sessions.values():
             flow = create_test_flow(session_events)
             flows.append(flow)
-        
+
         # Group similar flows and count frequencies
         flow_patterns = {}
         for flow in flows:
@@ -129,22 +126,22 @@ def extract_flows(
             if pattern not in flow_patterns:
                 flow_patterns[pattern] = {"count": 0, "flow": flow}
             flow_patterns[pattern]["count"] += 1
-        
+
         # Filter by minimum frequency
         common_flows = {
             pattern: data
             for pattern, data in flow_patterns.items()
             if data["count"] >= min_frequency
         }
-        
+
         # Save flows to output directory
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
-        
+
         for pattern, data in common_flows.items():
             flow = data["flow"]
             count = data["count"]
-            
+
             flow_path = output_path / f"{flow.name}.json"
             with open(flow_path, "w") as f:
                 json.dump(
@@ -156,13 +153,13 @@ def extract_flows(
                     f,
                     indent=2,
                 )
-        
+
         # Display summary
         table = Table(title="Extracted Test Flows")
         table.add_column("Flow Name")
         table.add_column("Frequency")
         table.add_column("Actions")
-        
+
         for pattern, data in common_flows.items():
             flow = data["flow"]
             count = data["count"]
@@ -171,9 +168,9 @@ def extract_flows(
                 str(count),
                 str(len(flow.actions)),
             )
-        
+
         console.print(table)
-        
+
     except Exception as e:
         console.print(f"[red]Error: {str(e)}[/red]")
-        raise click.Abort() 
+        raise click.Abort()
