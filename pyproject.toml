@@ -19,6 +19,9 @@ optional-dependencies = {dev = [
     "mypy>=1.8.0",
 ]}
 
+[project.scripts]
+testgenesis = "testgenesis_cli.commands.generate:generate"
+
 [build-system]
 requires = ["hatchling>=1.18.0", "hatch-vcs>=0.4.0"]
 build-backend = "hatchling.build"
@@ -28,16 +31,14 @@ source = "vcs"
 raw-options = { version_scheme = "post-release" }
 
 [tool.hatch.build]
-packages = [
-    "packages/dsl",
-    "packages/cli"
-]
+packages = ["packages/cli/testgenesis_cli", "packages/dsl/testgenesis_dsl"]
 include = [
     "packages/*/py.typed",
 ]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+package-dir = "packages/cli"
 
 [tool.hatch.envs.test]
 dependencies = [

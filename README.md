@@ -29,8 +29,8 @@ testgenesis/
 ## Quick Start
 
 ```bash
-# Install TestGenesis CLI
-uv pip install testgenesis-cli
+# Install dependencies
+uv pip install testgenesis
 
 # Set your Amplitude API key
 export AMPLITUDE_API_KEY=your-api-key
@@ -48,28 +48,64 @@ testgenesis generate test_flows/login_flow.json \
   --output tests/e2e/login.spec.ts
 ```
 
-## Development Setup
+## Development
+
+### Local Setup
+
+1. Install Python 3.12 or higher
+2. Install `uv` for package management
+3. Clone and set up the repository:
+   ```bash
+   # Clone the repository
+   git clone https://github.com/testgenesis/testgenesis.git
+   cd testgenesis
+
+   # Install in development mode with dev dependencies
+   uv pip install -e ".[dev]"
+
+   # If you need to update dependencies later, use:
+   uv pip install --upgrade -e ".[dev]"
+   ```
+
+### Running the CLI Locally
+
+After installation, you can use the CLI in two ways:
+
+1. Using the installed command:
+   ```bash
+   # Generate a test from a flow file
+   testgenesis path/to/flow.json --framework playwright --output test.spec.ts
+
+   # Extract flows from Amplitude
+   testgenesis amplitude extract-flows \
+     --api-key your-api-key \
+     --start-date 2024-03-01 \
+     --end-date 2024-03-31 \
+     --output-dir ./test_flows
+   ```
+
+2. Using the Python module directly:
+   ```bash
+   # Generate a test
+   python -m testgenesis_cli.commands.generate path/to/flow.json \
+     --framework playwright \
+     --output test.spec.ts
+
+   # Extract flows
+   python -m testgenesis_cli.analytics.amplitude extract-flows \
+     --api-key your-api-key \
+     --start-date 2024-03-01 \
+     --end-date 2024-03-31
+   ```
+
+The CLI is installed in development mode (-e), so any changes you make to the code will be immediately reflected without needing to reinstall.
+
+### Running Tests
+
+Use `pytest` to run tests:
 
 ```bash
-# Clone the repository
-git clone https://github.com/testgenesis/testgenesis.git
-cd testgenesis
-
-# Create virtual environment
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install all workspace packages in development mode
-uv pip install -e .
-
-# Install development tools
-uv pip install pytest>=7.0.0 pytest-cov>=4.1.0 black>=23.0.0 ruff>=0.2.0 mypy>=1.8.0
-```
-
-## Running Tests
-
-```bash
-# Run all tests across packages
+# Run all tests
 pytest
 
 # Run specific package tests
@@ -78,9 +114,15 @@ pytest packages/dsl/tests
 
 # Run with coverage
 pytest --cov=testgenesis_cli --cov=testgenesis_dsl
+
+# Watch mode for CLI tests
+pytest-watch packages/cli/tests
+
+# Watch mode for DSL tests
+pytest-watch packages/dsl/tests
 ```
 
-## Code Quality
+### Code Quality
 
 ```bash
 # Format code
