@@ -1,171 +1,122 @@
 # TestGenesis
 
-TestGenesis is an AI-powered testing platform that optimizes your test suite by intelligently analyzing, suggesting, and maintaining tests across the entire testing pyramid. It helps teams achieve the perfect balance between coverage, speed, and maintainability through data-driven insights and automated test optimization.
+Generate end-to-end tests automatically from user analytics data. TestGenesis analyzes real user behavior patterns and converts them into reliable test suites.
 
 ## Features
 
-### Core Test Analysis & Optimization (`packages/core`)
-- Comprehensive test suite analysis:
-  - Coverage mapping across all test types (unit, integration, E2E, contract)
-  - Identification of gaps and overlapping test coverage
-  - Performance impact analysis of each test
-  - Test flakiness detection and root cause analysis
-- Smart test recommendations:
-  - Suggests missing tests based on production incidents and user behavior
-  - Identifies opportunities to convert slow E2E tests to faster unit/integration tests
-  - Recommends contract tests for microservice boundaries
-  - Prioritizes test creation based on business impact
-- Automated test maintenance:
-  - Refactors flaky tests with ML-powered fixes
-  - Consolidates overlapping test coverage
-  - Optimizes test execution order for faster feedback
-  - Maintains optimal pyramid ratios through smart test distribution
-- Framework support:
-  - Unit: Jest, PyTest, JUnit
-  - Integration: REST-assured, SuperTest
-  - Contract: Pact, Spring Cloud Contract
-  - E2E: Selenium, Playwright
-- CI/CD optimization:
-  - Intelligent test selection based on code changes
-  - Parallel execution planning
-  - Test suite runtime optimization
-- Test governance and quality metrics
+- 🔄 **Analytics Integration**
+  - Extract user flows from Amplitude
+  - More platforms coming soon (GA4, Adobe Analytics)
+- 🎭 **Test Generation**
+  - Generate Playwright tests
+  - Generate Cypress tests
+  - Configurable assertions and validations
+- 🎯 **Smart Flow Detection**
+  - Identify common user paths
+  - Filter by frequency and importance
+  - Handle edge cases and variations
 
-### Common Utilities (`packages/common`)
-- Test analytics and metrics collection
-- Coverage mapping tools
-- Performance profiling
-- Configuration management
-- Test data management
-- API contract validation
+## Project Structure
 
-### UI Components (`packages/ui`)
-- Test pyramid visualization
-- Coverage analysis dashboards
-- Performance trends and insights
-- Test optimization recommendations
-- Recording interface
-
-## Installation
-
-```bash
-# Install from PyPI
-pip install testgenesis
-
-# Or install from source
-git clone https://github.com/testgenesis/testgenesis.git
-cd testgenesis
-uv venv
-source .venv/bin/activate
-uv pip install -e "packages/core[dev]"
+```
+testgenesis/
+├── packages/
+│   ├── dsl/           # Test flow DSL and code generation
+│   └── cli/           # Command-line interface
+└── pyproject.toml     # Workspace configuration
 ```
 
 ## Quick Start
 
-```python
-from testgenesis import TestGen, TestAnalyzer
+```bash
+# Install TestGenesis CLI
+uv pip install testgenesis-cli
 
-# Initialize TestGenesis
-test_gen = TestGen()
-analyzer = TestAnalyzer()
+# Set your Amplitude API key
+export AMPLITUDE_API_KEY=your-api-key
 
-# Analyze current test suite
-analysis = analyzer.analyze_suite(
-    project_root="./",
-    frameworks=["jest", "pytest", "playwright"]
-)
+# Extract flows from Amplitude
+testgenesis amplitude extract-flows \
+  --start-date 2024-03-01 \
+  --end-date 2024-03-31 \
+  --min-frequency 5 \
+  --output-dir ./test_flows
 
-# Get optimization recommendations
-recommendations = analyzer.get_recommendations(
-    analysis_id=analysis.id,
-    optimization_goals={
-        "reduce_runtime": True,
-        "improve_coverage": True,
-        "reduce_flakiness": True
-    }
-)
-
-# Apply recommended optimizations
-for rec in recommendations:
-    if rec.type == "convert_to_unit":
-        # Convert E2E test to unit test
-        test_gen.convert_test(
-            source_test=rec.source_test,
-            target_type="unit",
-            framework="jest"
-        )
-    elif rec.type == "add_contract_test":
-        # Add missing contract test
-        test_gen.generate_contract_test(
-            service=rec.service,
-            framework="pact"
-        )
-    elif rec.type == "fix_flaky":
-        # Apply ML-powered fix for flaky test
-        test_gen.fix_flaky_test(
-            test_path=rec.test_path,
-            fix_strategy=rec.suggested_fix
-        )
-
-# Monitor improvements
-metrics = analyzer.get_metrics(analysis.id)
-print(f"Runtime reduced by {metrics.runtime_reduction}%")
-print(f"Coverage increased by {metrics.coverage_increase}%")
-print(f"Flaky tests reduced by {metrics.flakiness_reduction}%")
+# Generate tests
+testgenesis generate test_flows/login_flow.json \
+  --framework playwright \
+  --output tests/e2e/login.spec.ts
 ```
 
-## Documentation
+## Development Setup
 
-Visit our [documentation](https://docs.testgenesis.com) for:
-- Detailed guides and tutorials
-- API reference
-- Best practices
-- Example projects
-- Integration guides
+```bash
+# Clone the repository
+git clone https://github.com/testgenesis/testgenesis.git
+cd testgenesis
 
-## Cloud Features
+# Create virtual environment
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-Need more advanced features? [TestGenesis Cloud](https://testgenesis.com/cloud) offers:
-- Advanced test suite analytics:
-  - Deep learning-based code analysis
-  - Production incident correlation
-  - User behavior pattern analysis
-  - Microservice dependency mapping
-- Intelligent test optimization:
-  - Automated test pyramid balancing
-  - ML-powered test conversion (E2E → unit/integration)
-  - Smart test parallelization
-  - Predictive test selection
-- Advanced test maintenance:
-  - Automated flaky test detection and repair
-  - Test impact analysis
-  - Duplicate coverage elimination
-  - Self-healing test scripts
-- Enterprise features:
-  - Cross-team test analytics
-  - Custom optimization rules
-  - Compliance reporting
-  - Priority support
+# Install all workspace packages in development mode
+uv pip install -e .
+
+# Install development tools
+uv pip install pytest>=7.0.0 pytest-cov>=4.1.0 black>=23.0.0 ruff>=0.2.0 mypy>=1.8.0
+```
+
+## Running Tests
+
+```bash
+# Run all tests across packages
+pytest
+
+# Run specific package tests
+pytest packages/cli/tests
+pytest packages/dsl/tests
+
+# Run with coverage
+pytest --cov=testgenesis_cli --cov=testgenesis_dsl
+```
+
+## Code Quality
+
+```bash
+# Format code
+ruff format .
+
+# Run linter
+ruff check .
+
+# Type checking
+mypy .
+```
+
+## Package Details
+
+### DSL Package (`packages/dsl`)
+- Test flow definition language
+- Code generation for different test frameworks
+- Flow validation and optimization
+
+### CLI Package (`packages/cli`)
+- Command-line interface for TestGenesis
+- Analytics platform integrations
+- Test generation commands
 
 ## Contributing
 
-We welcome contributions! Before contributing:
-1. Read our [Contributing Guide](CONTRIBUTING.md)
-2. Check out our [Development Guide](DEVELOPMENT.md)
-3. Look at our [Good First Issues](https://github.com/testgenesis/testgenesis/issues?q=is:issue+is:open+label:"good+first+issue")
-
-## Community
-
-- [Discord Community](https://discord.gg/testgenesis)
-- [GitHub Discussions](https://github.com/testgenesis/testgenesis/discussions)
-- [Twitter](https://twitter.com/testgenesisHQ)
-- [Blog](https://testgenesis.com/blog)
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Run tests to ensure they pass
+4. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
-
-
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 # Coming soon
 
