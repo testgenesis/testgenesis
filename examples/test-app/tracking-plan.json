@@ -1,0 +1,46 @@
+{
+  "version": "1.0.0",
+  "events": [
+    {
+      "name": "login_success",
+      "description": "User successfully logged in",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "description": "User ID of the logged in user",
+          "required": true
+        }
+      }
+    },
+    {
+      "name": "login_error",
+      "description": "Login attempt failed"
+    },
+    {
+      "name": "signup_start",
+      "description": "User started registration process"
+    },
+    {
+      "name": "signup_complete",
+      "description": "User completed registration",
+      "properties": {
+        "user_id": {
+          "type": "string",
+          "description": "User ID of the registered user",
+          "required": true
+        }
+      }
+    },
+    {
+      "name": "page_view",
+      "description": "User viewed a page",
+      "properties": {
+        "page": {
+          "type": "string",
+          "description": "Name of the page viewed",
+          "required": true
+        }
+      }
+    }
+  ]
+} 

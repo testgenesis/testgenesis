@@ -12,6 +12,20 @@ load_dotenv()
 # Global state for the current user
 current_user: User | None = None
 
+def add_amplitude_tracking():
+    """Add Amplitude tracking script to the page."""
+    ui.add_body_html('''
+    <script src="https://cdn.eu.amplitude.com/script/da0e05f882b7795f28eaba07890d418d.js"></script>
+    <script>
+        window.amplitude.add(window.sessionReplay.plugin({sampleRate: 1}));
+        window.amplitude.init('da0e05f882b7795f28eaba07890d418d', {
+            "fetchRemoteConfig":true,
+            "serverZone":"EU",
+            "autocapture":true
+        });
+    </script>
+    ''')
+
 def set_current_user(user: User | None):
     """Set the current user globally."""
     global current_user
@@ -21,6 +35,7 @@ def set_current_user(user: User | None):
 @ui.page('/')
 def index():
     """Redirect to login page."""
+    add_amplitude_tracking()
     print("Index page accessed")
     if current_user:
         print(f"Index: Redirecting logged in user {current_user.username} to store")
@@ -32,6 +47,7 @@ def index():
 @ui.page('/login')
 def login():
     """Login page."""
+    add_amplitude_tracking()
     print("Login page accessed")
     if current_user:
         print(f"Login: Already logged in as {current_user.username}, redirecting to store")
@@ -44,6 +60,7 @@ def login():
 @ui.page('/register')
 def register():
     """Registration page."""
+    add_amplitude_tracking()
     print("Register page accessed")
     if current_user:
         print(f"Register: Already logged in as {current_user.username}, redirecting to store")
@@ -56,6 +73,7 @@ def register():
 @ui.page('/store')
 def store():
     """Store page."""
+    add_amplitude_tracking()
     print("Store page accessed")
     print(f"Store: Current user is: {current_user.username if current_user else None}")
     if not current_user:
@@ -69,6 +87,7 @@ def store():
 @ui.page('/cart')
 def cart():
     """Cart page."""
+    add_amplitude_tracking()
     if not current_user:
         ui.navigate.to('/login')
         return
@@ -78,6 +97,7 @@ def cart():
 @ui.page('/profile')
 def profile():
     """Profile page."""
+    add_amplitude_tracking()
     if not current_user:
         ui.navigate.to('/login')
         return
@@ -89,6 +109,6 @@ if __name__ in {"__main__", "__mp_main__"}:
         title='TestGenesis Test App',
         favicon='🛍️',
         dark=True,
-        reload=True,
+        reload=False,  # Disable auto-reload to prevent state resets
         port=8081,
     ) 
