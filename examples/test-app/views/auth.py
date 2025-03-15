@@ -1,8 +1,9 @@
 from nicegui import ui
-from lib.auth import authenticate_user, register_user
+from lib.auth import authenticate_user, register_user, User
 from lib.amplitude import track_event
+from typing import Callable
 
-def create_login_page():
+def create_login_page(set_current_user: Callable[[User | None], None]):
     """Create the login page."""
     with ui.card().classes('w-96'):
         ui.label('Login').classes('text-h6')
@@ -13,7 +14,10 @@ def create_login_page():
             try:
                 user = authenticate_user(username.value, password.value)
                 if user:
+                    print(f"Login successful - User: {user.username} (ID: {user.user_id})")
                     track_event('login_success', user.user_id)
+                    set_current_user(user)
+                    print(f"Current user set to: {user.username}")
                     ui.navigate.to('/store')
                 else:
                     track_event('login_error')
@@ -21,6 +25,13 @@ def create_login_page():
             except Exception as e:
                 track_event('login_error')
                 ui.notify(str(e), type='negative')
+        
+        # Handle Enter key press
+        def on_enter(_):
+            handle_login()
+        
+        username.on('keydown.enter', on_enter)
+        password.on('keydown.enter', on_enter)
         
         ui.button('Login', on_click=handle_login).classes('w-full')
         ui.button('Register', on_click=lambda: ui.navigate.to('/register')).classes('w-full')
@@ -46,6 +57,14 @@ def create_register_page():
                 ui.navigate.to('/login')
             except Exception as e:
                 ui.notify(str(e), type='negative')
+        
+        # Handle Enter key press
+        def on_enter(_):
+            handle_register()
+        
+        username.on('keydown.enter', on_enter)
+        password.on('keydown.enter', on_enter)
+        confirm_password.on('keydown.enter', on_enter)
         
         ui.button('Register', on_click=handle_register).classes('w-full')
         ui.button('Back to Login', on_click=lambda: ui.navigate.to('/login')).classes('w-full') 
