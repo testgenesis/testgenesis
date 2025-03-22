@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import io
 import zipfile
+import gzip
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
@@ -466,3 +467,229 @@ def test_extract_flows_invalid_dates():
 
     assert result.exit_code != 0
     assert "Error" in result.output
+
+
+@patch("testgenesis_cli.analytics.amplitude.requests.get")
+def test_extract_flows_with_gzipped_file(mock_requests_get, tmp_path, mock_amplitude_events):
+    """Test extracting flows from Amplitude with gzipped file in the ZIP."""
+    # Create a mock ZIP file with gzipped Amplitude data
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+        # Create gzipped content
+        event_data = "\n".join(json.dumps(event) for event in mock_amplitude_events)
+        gzip_buffer = io.BytesIO()
+        with gzip.GzipFile(fileobj=gzip_buffer, mode="w") as gz_file:
+            gz_file.write(event_data.encode("utf-8"))
+        
+        # Add the gzipped file to the ZIP with a .gz extension
+        zip_file.writestr("events.json.gz", gzip_buffer.getvalue())
+    
+    # Create mock response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = zip_buffer.getvalue()
+    mock_requests_get.return_value = mock_response
+
+    # Run command
+    runner = CliRunner()
+    output_dir = tmp_path / "test_flows_gzip"
+
+    result = runner.invoke(
+        amplitude,
+        [
+            "extract-flows",
+            "--api-key",
+            "test-key",
+            "--secret-key",
+            "test-secret",
+            "--start-date",
+            "2024-03-01",
+            "--end-date",
+            "2024-03-31",
+            "--min-frequency",
+            "1",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output_dir.exists()
+    
+    # Check that we processed the events correctly
+    flow_files = list(output_dir.glob("*.json"))
+    assert len(flow_files) == 1
+    
+    flow_data = json.loads(flow_files[0].read_text())
+    assert flow_data["name"] == "user_flow_session1"
+    assert len(flow_data["actions"]) == 2
+
+
+@patch("testgenesis_cli.analytics.amplitude.requests.get")
+def test_extract_flows_with_gzip_content_no_extension(mock_requests_get, tmp_path, mock_amplitude_events):
+    """Test extracting flows from Amplitude with gzipped content but no .gz extension."""
+    # Create a mock ZIP file with gzipped Amplitude data but without .gz extension
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+        # Create gzipped content
+        event_data = "\n".join(json.dumps(event) for event in mock_amplitude_events)
+        gzip_buffer = io.BytesIO()
+        with gzip.GzipFile(fileobj=gzip_buffer, mode="w") as gz_file:
+            gz_file.write(event_data.encode("utf-8"))
+        
+        # Add the gzipped file to the ZIP without a .gz extension
+        zip_file.writestr("events.json", gzip_buffer.getvalue())
+    
+    # Create mock response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = zip_buffer.getvalue()
+    mock_requests_get.return_value = mock_response
+
+    # Run command
+    runner = CliRunner()
+    output_dir = tmp_path / "test_flows_gzip_no_ext"
+
+    result = runner.invoke(
+        amplitude,
+        [
+            "extract-flows",
+            "--api-key",
+            "test-key",
+            "--secret-key",
+            "test-secret",
+            "--start-date",
+            "2024-03-01",
+            "--end-date",
+            "2024-03-31",
+            "--min-frequency",
+            "1",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output_dir.exists()
+    
+    # Check that we processed the events correctly
+    flow_files = list(output_dir.glob("*.json"))
+    assert len(flow_files) == 1
+    
+    flow_data = json.loads(flow_files[0].read_text())
+    assert flow_data["name"] == "user_flow_session1"
+    assert len(flow_data["actions"]) == 2
+
+
+@patch("testgenesis_cli.analytics.amplitude.requests.get")
+def test_extract_flows_with_corrupted_gz(mock_requests_get, tmp_path, mock_amplitude_events):
+    """Test handling of corrupted gzip files."""
+    # Create a mock ZIP file with corrupted gzipped data
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+        # Create valid events for one file
+        event_data = "\n".join(json.dumps(event) for event in mock_amplitude_events)
+        zip_file.writestr("events_valid.json", event_data)
+        
+        # Create corrupted gzip content (just a few bytes of gzip header)
+        corrupted_data = b'\x1f\x8b\x08\x00corrupted gzip data'
+        zip_file.writestr("events_corrupted.json.gz", corrupted_data)
+    
+    # Create mock response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = zip_buffer.getvalue()
+    mock_requests_get.return_value = mock_response
+
+    # Run command
+    runner = CliRunner()
+    output_dir = tmp_path / "test_flows_corrupted_gzip"
+
+    result = runner.invoke(
+        amplitude,
+        [
+            "extract-flows",
+            "--api-key",
+            "test-key",
+            "--secret-key",
+            "test-secret",
+            "--start-date",
+            "2024-03-01",
+            "--end-date",
+            "2024-03-31",
+            "--min-frequency",
+            "1",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    # The command should still succeed, with just a warning about the corrupted file
+    assert result.exit_code == 0
+    assert "Warning: Error" in result.output
+    assert output_dir.exists()
+    
+    # Check that we processed the valid events
+    flow_files = list(output_dir.glob("*.json"))
+    assert len(flow_files) == 1
+    
+    flow_data = json.loads(flow_files[0].read_text())
+    assert flow_data["name"] == "user_flow_session1"
+    assert len(flow_data["actions"]) == 2
+
+
+@patch("testgenesis_cli.analytics.amplitude.requests.get")
+def test_extract_flows_with_encoding_errors(mock_requests_get, tmp_path, mock_amplitude_events):
+    """Test handling of encoding errors in file content."""
+    # Create a mock ZIP file with valid events and invalid UTF-8 content
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+        # Create valid events for one file
+        event_data = "\n".join(json.dumps(event) for event in mock_amplitude_events)
+        zip_file.writestr("events_valid.json", event_data)
+        
+        # Create data with invalid UTF-8 encoding (byte sequence that is not valid UTF-8)
+        invalid_utf8 = b'{"event_id": 1, "session_id": "session1", "invalid_field": "\xFF\xFE invalid UTF-8"}'
+        zip_file.writestr("events_invalid.json", invalid_utf8)
+    
+    # Create mock response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = zip_buffer.getvalue()
+    mock_requests_get.return_value = mock_response
+
+    # Run command
+    runner = CliRunner()
+    output_dir = tmp_path / "test_flows_encoding_errors"
+
+    result = runner.invoke(
+        amplitude,
+        [
+            "extract-flows",
+            "--api-key",
+            "test-key",
+            "--secret-key",
+            "test-secret",
+            "--start-date",
+            "2024-03-01",
+            "--end-date",
+            "2024-03-31",
+            "--min-frequency",
+            "1",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    # The command should still succeed, with just a warning about the encoding error
+    assert result.exit_code == 0
+    assert "Warning" in result.output
+    assert output_dir.exists()
+    
+    # Check that we processed the valid events
+    flow_files = list(output_dir.glob("*.json"))
+    assert len(flow_files) == 1
+    
+    flow_data = json.loads(flow_files[0].read_text())
+    assert flow_data["name"] == "user_flow_session1"
+    assert len(flow_data["actions"]) == 2

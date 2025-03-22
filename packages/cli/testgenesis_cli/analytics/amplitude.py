@@ -3,6 +3,7 @@
 import json
 import io
 import zipfile
+import gzip
 import requests
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -99,12 +100,52 @@ def extract_user_flows(
     # Process the ZIP file response
     events = []
     with zipfile.ZipFile(io.BytesIO(response.content)) as zip_file:
-        console.print(f"Processing {len(zip_file.namelist())} event files...")
-        for file_name in zip_file.namelist():
+        file_list = zip_file.namelist()
+        console.print(f"Processing {len(file_list)} event files...")
+        
+        for file_name in file_list:
+            # Check if the file is a gzip file by name
+            is_gzip_by_name = file_name.endswith('.gz')
+            
             with zip_file.open(file_name) as file:
-                for line in file:
-                    event = json.loads(line)
-                    events.append(event)
+                try:
+                    # Try to decompress if gzipped
+                    try:
+                        # Check if the file content is gzipped
+                        file_content = file.read()
+                        
+                        # Process based on whether it's a gzip file by name or content
+                        if is_gzip_by_name or file_content.startswith(b'\x1f\x8b'):  # gzip magic number
+                            # Decompress gzip content
+                            with io.BytesIO(file_content) as compressed_stream:
+                                with gzip.GzipFile(fileobj=compressed_stream) as gzip_stream:
+                                    decompressed_content = gzip_stream.read()
+                            lines = decompressed_content.splitlines()
+                        else:
+                            lines = file_content.splitlines()
+                    except Exception as e:
+                        console.print(f"[yellow]Warning: Error decompressing file {file_name}: {e}[/yellow]")
+                        # Fall back to reading file directly
+                        file.seek(0)
+                        lines = file.readlines()
+                    
+                    for line in lines:
+                        if isinstance(line, bytes):
+                            try:
+                                line = line.decode('utf-8')
+                            except UnicodeDecodeError:
+                                console.print(f"[yellow]Warning: Cannot decode line as UTF-8, skipping.[/yellow]")
+                                continue
+                        if line.strip():  # Skip empty lines
+                            try:
+                                event = json.loads(line)
+                                events.append(event)
+                            except json.JSONDecodeError as e:
+                                console.print(f"[yellow]Warning: Invalid JSON format: {e}[/yellow]")
+                                continue
+                except Exception as e:
+                    console.print(f"[yellow]Warning: Error processing file {file_name}: {e}[/yellow]")
+                    continue
     
     console.print(f"Found {len(events)} events.")
     
