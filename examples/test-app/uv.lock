@@ -115,15 +115,6 @@ wheels = [
 ]
 
 [[package]]
-name = "amplitude-analytics"
-version = "1.1.5"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ea/d8/4c35f6e844e4d967c35e130570f3f663acc09db5430eab78b9fddb48d5fb/amplitude_analytics-1.1.5.tar.gz", hash = "sha256:2836fcf88d75506a1f266a5582253fdf592e14fafaf5783017baeec2118369d4", size = 21787 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/c6/39cea4c4b5791312c81b7935ef2065d3e86ff050008c069a042f77f5c583/amplitude_analytics-1.1.5-py3-none-any.whl", hash = "sha256:da7db1985087d2b9ef0456115d116525888f416e174ef79b53e1532be7a0b3bd", size = 24138 },
-]
-
-[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1107,7 +1098,6 @@ name = "testgenesis-test-app"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "amplitude-analytics" },
     { name = "bcrypt" },
     { name = "nicegui" },
     { name = "python-dotenv" },
@@ -1115,7 +1105,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "amplitude-analytics", specifier = ">=1.1.1" },
     { name = "bcrypt", specifier = ">=4.1.2" },
     { name = "nicegui", specifier = ">=1.4.12" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
