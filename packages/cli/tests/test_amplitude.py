@@ -5,13 +5,19 @@ import json
 import io
 import zipfile
 import gzip
+import yaml
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
 import pytest
 from click.testing import CliRunner
+from hypothesis import settings, given, strategies as st
 
-from testgenesis_cli.analytics.amplitude import amplitude, create_test_flow, get_yesterday, get_today
+from testgenesis_cli.analytics.amplitude import (
+    amplitude, create_test_flow, get_yesterday, get_today
+)
+from testgenesis_cli.analytics.scorer import FlowScorer, save_config
+from tests.strategies.flow import flow_data, config_data
 
 
 @pytest.fixture
@@ -693,3 +699,319 @@ def test_extract_flows_with_encoding_errors(mock_requests_get, tmp_path, mock_am
     flow_data = json.loads(flow_files[0].read_text())
     assert flow_data["name"] == "user_flow_session1"
     assert len(flow_data["actions"]) == 2
+
+
+@pytest.fixture
+def mock_config():
+    """Create a mock configuration file."""
+    return {
+        "weights": {
+            "error_weight": 2.0,
+            "business_weight": 1.5
+        },
+        "business_criticality": {
+            "default": 2,
+            "login": 5,
+            "checkout": 4
+        }
+    }
+
+@pytest.fixture
+def config_file(tmp_path, mock_config):
+    """Create a temporary config file."""
+    config_path = tmp_path / "config.yaml"
+    with open(config_path, 'w') as f:
+        yaml.dump(mock_config, f)
+    return config_path
+
+def test_flow_scorer_default_config(tmp_path):
+    """Test FlowScorer with default configuration."""
+    # Create a temporary config file with default values
+    config_file = tmp_path / "config.yaml"
+    config = {
+        "weights": {"error_weight": 2.0, "business_weight": 1.5},
+        "business_criticality": {"default": 2}
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(config, f)
+    
+    scorer = FlowScorer(str(config_file))
+    assert scorer.weights == {"error_weight": 2.0, "business_weight": 1.5}
+    assert scorer.business_criticality == {"default": 2}
+
+def test_flow_scorer_load_config(config_file):
+    """Test FlowScorer loading configuration from file."""
+    scorer = FlowScorer(str(config_file))
+    assert scorer.weights["error_weight"] == 2.0
+    assert scorer.weights["business_weight"] == 1.5
+    assert scorer.business_criticality["login"] == 5
+    assert scorer.business_criticality["checkout"] == 4
+
+def test_flow_scorer_get_business_criticality(config_file):
+    """Test getting business criticality for different pages."""
+    scorer = FlowScorer(str(config_file))
+    assert scorer.get_business_criticality("/login") == 5
+    assert scorer.get_business_criticality("/checkout") == 4
+    assert scorer.get_business_criticality("/unknown") == 2  # default
+
+def test_flow_scorer_calculate_score(tmp_path):
+    """Test flow score calculation."""
+    # Create a temporary config file
+    config_file = tmp_path / "config.yaml"
+    config = {
+        "weights": {"error_weight": 2.0, "business_weight": 1.5},
+        "business_criticality": {
+            "default": 2,
+            "login": 5,
+            "checkout": 4,
+            "profile": 3
+        }
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(config, f)
+    
+    scorer = FlowScorer(str(config_file))
+    
+    # Test flow with errors and page views
+    flow = {
+        "frequency": 10,
+        "actions": [
+            {
+                "type": "[Amplitude] Page Viewed",
+                "data": {"[Amplitude] Page URL": "/login"}
+            },
+            {"type": "error", "target": "error1"},
+            {"type": "error", "target": "error2"}
+        ]
+    }
+    
+    result = scorer.calculate_score(flow)
+    assert result["frequency"] == 10
+    assert result["error_count"] == 2
+    assert result["business_criticality"] == 5  # login page criticality
+    assert result["score"] == 10 + (2 * 2.0) + (5 * 1.5)  # frequency + (errors * error_weight) + (criticality * business_weight)
+
+def test_config_commands(tmp_path):
+    """Test configuration management commands."""
+    runner = CliRunner()
+    config_file = tmp_path / "config.yaml"
+    
+    # Create initial config file
+    initial_config = {
+        "weights": {"error_weight": 2.0, "business_weight": 1.5},
+        "business_criticality": {"default": 2}
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(initial_config, f)
+    
+    # Test show command
+    result = runner.invoke(amplitude, ["config", "show", "--config-path", str(config_file)])
+    assert result.exit_code == 0
+    config_data = yaml.safe_load(result.output)
+    assert config_data["weights"]["error_weight"] == 2.0
+    assert config_data["business_criticality"]["default"] == 2
+    
+    # Test set-weight command
+    result = runner.invoke(amplitude, [
+        "config", "set-weight",
+        "--weight-name", "error_weight",
+        "--value", "3.0",
+        "--config-path", str(config_file)
+    ])
+    assert result.exit_code == 0
+    assert "Updated error_weight to 3.0" in result.output
+    
+    # Test set-criticality command
+    result = runner.invoke(amplitude, [
+        "config", "set-criticality",
+        "--page", "profile",
+        "--value", "3",
+        "--config-path", str(config_file)
+    ])
+    assert result.exit_code == 0
+    assert "Updated criticality for profile to 3" in result.output
+
+def test_score_flows_command(tmp_path):
+    """Test the score-flows CLI command."""
+    # Create config file
+    config_file = tmp_path / "config.yaml"
+    config = {
+        "weights": {"error_weight": 2.0, "business_weight": 1.5},
+        "business_criticality": {
+            "default": 2,
+            "login": 5,
+            "checkout": 4,
+            "profile": 3
+        }
+    }
+    with open(config_file, 'w') as f:
+        yaml.dump(config, f)
+    
+    # Create a test flow file
+    flow_file = tmp_path / "user_flow_123.json"
+    flow_data = {
+        "frequency": 10,
+        "actions": [
+            {
+                "type": "[Amplitude] Page Viewed",
+                "data": {"[Amplitude] Page URL": "/login"}
+            },
+            {"type": "error", "target": "error1"}
+        ]
+    }
+    with open(flow_file, 'w') as f:
+        json.dump(flow_data, f)
+    
+    runner = CliRunner()
+    result = runner.invoke(amplitude, [
+        "score-flows",
+        "--flows-dir", str(tmp_path),
+        "--config-path", str(config_file)
+    ])
+    
+    assert result.exit_code == 0
+    assert "Flow Scores" in result.output
+    assert "user_flow_123.json" in result.output
+    assert "10" in result.output  # frequency
+    assert "1" in result.output   # error count
+    assert "5.0" in result.output # business criticality
+    
+    # Test output to file
+    output_file = tmp_path / "scores.json"
+    result = runner.invoke(amplitude, [
+        "score-flows",
+        "--flows-dir", str(tmp_path),
+        "--config-path", str(config_file),
+        "--output", str(output_file)
+    ])
+    
+    assert result.exit_code == 0
+    assert "Saved scores to" in result.output
+    with open(output_file) as f:
+        scores = json.load(f)
+        assert len(scores) == 1
+        assert scores[0]["flow_file"] == "user_flow_123.json"
+        assert scores[0]["frequency"] == 10
+        assert scores[0]["error_count"] == 1
+        assert scores[0]["business_criticality"] == 5
+
+# Hypothesis tests
+@given(
+    flow=flow_data(),
+    config=config_data(),
+)
+@settings(max_examples=10)
+def test_flow_scorer_properties(flow, config):
+    """Test properties that should always hold for flow scoring."""
+    scorer = FlowScorer(config)  # Pass config directly instead of mocking file
+    result = scorer.calculate_score(flow)
+    
+    # Basic properties that should always hold
+    assert result["frequency"] == flow["frequency"]
+    assert result["error_count"] >= 0
+    assert result["score"] >= 0
+    
+    # Count errors correctly
+    expected_errors = sum(1 for action in flow["actions"] 
+                        if action["type"].lower().startswith("error"))
+    assert result["error_count"] == expected_errors
+    
+    # Business criticality should be 0 if no page views
+    page_views = [action for action in flow["actions"] 
+                 if action["type"] == "[Amplitude] Page Viewed"]
+    if not page_views:
+        assert result["business_criticality"] == 0
+        assert result["score"] == flow["frequency"] + (expected_errors * config["weights"]["error_weight"])
+    else:
+        # Business criticality should be from config or default
+        first_page = page_views[0]["data"]["[Amplitude] Page URL"]
+        page_name = first_page.split('/')[-1].lower()
+        expected_criticality = config["business_criticality"].get(page_name, config["business_criticality"]["default"])
+        assert result["business_criticality"] == expected_criticality
+        
+        # Score should be calculated correctly
+        expected_score = (
+            flow["frequency"] +
+            (expected_errors * config["weights"]["error_weight"]) +
+            (expected_criticality * config["weights"]["business_weight"])
+        )
+        assert result["score"] == expected_score
+
+@given(
+    data=st.data(),
+)
+@settings(max_examples=10)
+def test_flow_scorer_edge_cases(data):
+    """Test edge cases for flow scoring."""
+    config = {
+        "weights": {"error_weight": 2.0, "business_weight": 1.5},
+        "business_criticality": {"default": 2}
+    }
+    scorer = FlowScorer(config)  # Pass config directly
+    
+    # Test empty flow
+    empty_flow = {"frequency": 0, "actions": []}
+    result = scorer.calculate_score(empty_flow)
+    assert result["score"] == 0
+    assert result["error_count"] == 0
+    assert result["business_criticality"] == 0
+    
+    # Test flow with only errors
+    error_flow = {
+        "frequency": 10,
+        "actions": [
+            {"type": "error", "target": "error1"},
+            {"type": "error", "target": "error2"}
+        ]
+    }
+    result = scorer.calculate_score(error_flow)
+    assert result["score"] == 10 + (2 * 2.0)  # frequency + (errors * error_weight)
+    assert result["business_criticality"] == 0
+    
+    # Test flow with only page view
+    page_flow = {
+        "frequency": 10,
+        "actions": [
+            {
+                "type": "[Amplitude] Page Viewed",
+                "data": {"[Amplitude] Page URL": "/unknown"}
+            }
+        ]
+    }
+    result = scorer.calculate_score(page_flow)
+    assert result["score"] == 10 + (2 * 1.5)  # frequency + (default criticality * business_weight)
+    assert result["error_count"] == 0
+
+@given(
+    data=st.data(),
+)
+@settings(max_examples=5)  # Reduce number of examples
+def test_flow_scorer_page_criticality(data):
+    """Test business criticality calculation for different pages."""
+    config = {
+        "weights": {"error_weight": 2.0, "business_weight": 1.5},
+        "business_criticality": {
+            "default": 2,
+            "login": 5,
+            "checkout": 4,
+            "profile": 3
+        }
+    }
+    scorer = FlowScorer(config)  # Pass config directly
+    
+    # Test known pages
+    pages = ["/login", "/checkout", "/profile", "/unknown"]
+    for page in pages:
+        flow = {
+            "frequency": 10,
+            "actions": [
+                {
+                    "type": "[Amplitude] Page Viewed",
+                    "data": {"[Amplitude] Page URL": page}
+                }
+            ]
+        }
+        result = scorer.calculate_score(flow)
+        page_name = page.split('/')[-1].lower()
+        expected_criticality = config["business_criticality"].get(page_name, config["business_criticality"]["default"])
+        assert result["business_criticality"] == expected_criticality
