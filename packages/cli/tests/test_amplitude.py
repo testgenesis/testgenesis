@@ -796,20 +796,21 @@ def test_config_commands(tmp_path):
     runner = CliRunner()
     config_file = tmp_path / "config.yaml"
     
-    # Create initial config file
-    initial_config = {
-        "weights": {"error_weight": 2.0, "business_weight": 1.5},
-        "business_criticality": {"default": 2}
-    }
-    with open(config_file, 'w') as f:
-        yaml.dump(initial_config, f)
-    
-    # Test show command
+    # Test show command with non-existent config
     result = runner.invoke(amplitude, ["config", "show", "--config-path", str(config_file)])
     assert result.exit_code == 0
-    config_data = yaml.safe_load(result.output)
-    assert config_data["weights"]["error_weight"] == 2.0
-    assert config_data["business_criticality"]["default"] == 2
+    assert "Created default configuration at" in result.output
+    assert "Please edit the configuration file" in result.output
+    
+    # Verify the config file was created with default values
+    with open(config_file) as f:
+        config_data = yaml.safe_load(f)
+        assert config_data["weights"]["error_weight"] == 2.0
+        assert config_data["weights"]["business_weight"] == 1.5
+        assert config_data["business_criticality"]["default"] == 2
+        assert config_data["business_criticality"]["login"] == 5
+        assert config_data["business_criticality"]["checkout"] == 4
+        assert config_data["business_criticality"]["profile"] == 3
     
     # Test set-weight command
     result = runner.invoke(amplitude, [
@@ -821,6 +822,11 @@ def test_config_commands(tmp_path):
     assert result.exit_code == 0
     assert "Updated error_weight to 3.0" in result.output
     
+    # Verify the weight was updated
+    with open(config_file) as f:
+        config_data = yaml.safe_load(f)
+        assert config_data["weights"]["error_weight"] == 3.0
+    
     # Test set-criticality command
     result = runner.invoke(amplitude, [
         "config", "set-criticality",
@@ -830,23 +836,14 @@ def test_config_commands(tmp_path):
     ])
     assert result.exit_code == 0
     assert "Updated criticality for profile to 3" in result.output
+    
+    # Verify the criticality was updated
+    with open(config_file) as f:
+        config_data = yaml.safe_load(f)
+        assert config_data["business_criticality"]["profile"] == 3
 
 def test_score_flows_command(tmp_path):
     """Test the score-flows CLI command."""
-    # Create config file
-    config_file = tmp_path / "config.yaml"
-    config = {
-        "weights": {"error_weight": 2.0, "business_weight": 1.5},
-        "business_criticality": {
-            "default": 2,
-            "login": 5,
-            "checkout": 4,
-            "profile": 3
-        }
-    }
-    with open(config_file, 'w') as f:
-        yaml.dump(config, f)
-    
     # Create a test flow file
     flow_file = tmp_path / "user_flow_123.json"
     flow_data = {
@@ -862,6 +859,8 @@ def test_score_flows_command(tmp_path):
     with open(flow_file, 'w') as f:
         json.dump(flow_data, f)
     
+    # Test with non-existent config file
+    config_file = tmp_path / "config.yaml"
     runner = CliRunner()
     result = runner.invoke(amplitude, [
         "score-flows",
@@ -870,11 +869,22 @@ def test_score_flows_command(tmp_path):
     ])
     
     assert result.exit_code == 0
+    assert "Created default configuration at" in result.output
+    assert "Please edit the configuration file" in result.output
     assert "Flow Scores" in result.output
     assert "user_flow_123.json" in result.output
     assert "10" in result.output  # frequency
     assert "1" in result.output   # error count
     assert "5.0" in result.output # business criticality
+    
+    # Verify config file was created with values based on flow data
+    with open(config_file) as f:
+        config = yaml.safe_load(f)
+        # With 1 flow and 1 error, error_frequency = 1.0 > 0.5, so error_weight should be 1.5
+        assert config["weights"]["error_weight"] == 1.5
+        assert config["weights"]["business_weight"] == 1.5
+        assert config["business_criticality"]["default"] == 2
+        assert config["business_criticality"]["login"] == 5
     
     # Test output to file
     output_file = tmp_path / "scores.json"
@@ -1015,3 +1025,120 @@ def test_flow_scorer_page_criticality(data):
         page_name = page.split('/')[-1].lower()
         expected_criticality = config["business_criticality"].get(page_name, config["business_criticality"]["default"])
         assert result["business_criticality"] == expected_criticality
+
+def test_flow_scorer_config_generation(tmp_path):
+    """Test generating config from flow data."""
+    # Create test flow files with different pages and errors
+    flows_dir = tmp_path / "test_flows"
+    flows_dir.mkdir()
+    
+    # Flow with login page and errors
+    flow1 = {
+        "frequency": 10,
+        "actions": [
+            {
+                "type": "[Amplitude] Page Viewed",
+                "data": {"[Amplitude] Page URL": "/login"}
+            },
+            {"type": "error", "target": "error1"},
+            {"type": "error", "target": "error2"}
+        ]
+    }
+    
+    # Flow with checkout page and no errors
+    flow2 = {
+        "frequency": 5,
+        "actions": [
+            {
+                "type": "[Amplitude] Page Viewed",
+                "data": {"[Amplitude] Page URL": "/checkout"}
+            }
+        ]
+    }
+    
+    # Flow with unknown page and errors
+    flow3 = {
+        "frequency": 3,
+        "actions": [
+            {
+                "type": "[Amplitude] Page Viewed",
+                "data": {"[Amplitude] Page URL": "/unknown"}
+            },
+            {"type": "error", "target": "error3"}
+        ]
+    }
+    
+    # Write flow files
+    with open(flows_dir / "flow1.json", 'w') as f:
+        json.dump(flow1, f)
+    with open(flows_dir / "flow2.json", 'w') as f:
+        json.dump(flow2, f)
+    with open(flows_dir / "flow3.json", 'w') as f:
+        json.dump(flow3, f)
+    
+    # Generate config from flows
+    config_file = tmp_path / "config.yaml"
+    scorer = FlowScorer(str(config_file), str(flows_dir))
+    
+    # Verify config contents
+    with open(config_file) as f:
+        config = yaml.safe_load(f)
+        
+        # Check weights (should be adjusted based on error frequency)
+        # With 3 flows and 3 errors, error_frequency = 1.0 > 0.5, so error_weight should be 1.5
+        assert config["weights"]["error_weight"] == 1.5
+        assert config["weights"]["business_weight"] == 1.5
+        
+        # Check business criticality
+        assert config["business_criticality"]["default"] == 2
+        assert config["business_criticality"]["login"] == 5
+        assert config["business_criticality"]["checkout"] == 4
+        assert "unknown" not in config["business_criticality"]
+
+def test_score_flows_command_with_config_generation(tmp_path):
+    """Test the score-flows CLI command with config generation."""
+    # Create test flow files
+    flows_dir = tmp_path / "test_flows"
+    flows_dir.mkdir()
+    
+    # Create a test flow file with login page and errors
+    flow_file = flows_dir / "user_flow_123.json"
+    flow_data = {
+        "frequency": 10,
+        "actions": [
+            {
+                "type": "[Amplitude] Page Viewed",
+                "data": {"[Amplitude] Page URL": "/login"}
+            },
+            {"type": "error", "target": "error1"}
+        ]
+    }
+    with open(flow_file, 'w') as f:
+        json.dump(flow_data, f)
+    
+    # Test with non-existent config file
+    config_file = tmp_path / "config.yaml"
+    runner = CliRunner()
+    result = runner.invoke(amplitude, [
+        "score-flows",
+        "--flows-dir", str(flows_dir),
+        "--config-path", str(config_file)
+    ])
+    
+    assert result.exit_code == 0
+    assert "Created default configuration at" in result.output
+    assert "Please edit the configuration file" in result.output
+    assert "Flow Scores" in result.output
+    assert "user_flow_123.json" in result.output
+    assert "10" in result.output  # frequency
+    assert "1" in result.output   # error count
+    assert "5.0" in result.output # business criticality
+    
+    # Verify config file was created with values based on flow data
+    with open(config_file) as f:
+        config = yaml.safe_load(f)
+        # With 1 flow and 1 error, error_frequency = 1.0 > 0.5, so error_weight should be 1.5
+        assert config["weights"]["error_weight"] == 1.5
+        assert config["weights"]["business_weight"] == 1.5
+        assert config["business_criticality"]["default"] == 2
+        assert config["business_criticality"]["login"] == 5

@@ -2,33 +2,132 @@
 
 import yaml
 from pathlib import Path
-from typing import Dict, Union, Any
+from typing import Dict, Union, Any, Optional
+import json
+
+
+def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
+    """Generate a default configuration based on flow data.
+    
+    Args:
+        flows_dir: Optional directory containing flow files to analyze.
+                  If provided, will scan flows to determine pages and weights.
+    
+    Returns:
+        Dict containing the default configuration.
+    """
+    if not flows_dir:
+        return {
+            "weights": {
+                "error_weight": 2.0,
+                "business_weight": 1.5
+            },
+            "business_criticality": {
+                "default": 2,
+                "login": 5,
+                "checkout": 4,
+                "profile": 3
+            }
+        }
+    
+    # Scan flows to find unique pages and error patterns
+    pages = set()
+    error_count = 0
+    total_flows = 0
+    
+    for flow_file in Path(flows_dir).glob("*.json"):
+        try:
+            with open(flow_file) as f:
+                flow = json.load(f)
+                total_flows += 1
+                
+                # Extract pages
+                for action in flow.get("actions", []):
+                    if action["type"] == "[Amplitude] Page Viewed":
+                        page = action["data"]["[Amplitude] Page URL"]
+                        pages.add(page)
+                    
+                    # Count errors
+                    if action["type"].lower().startswith("error"):
+                        error_count += 1
+        except Exception:
+            continue
+    
+    # Calculate weights based on data
+    error_weight = 2.0
+    business_weight = 1.5
+    
+    if total_flows > 0:
+        # Adjust error weight based on error frequency
+        error_frequency = error_count / total_flows
+        if error_frequency > 0.5:
+            error_weight = 1.5  # Reduce error weight if errors are common
+        elif error_frequency < 0.1:
+            error_weight = 2.5  # Increase error weight if errors are rare
+    
+    # Generate business criticality based on page names
+    business_criticality = {"default": 2}
+    
+    # Common page patterns and their criticality
+    critical_pages = {
+        "login": 5,
+        "checkout": 4,
+        "profile": 3,
+        "payment": 4,
+        "signup": 4,
+        "settings": 3,
+        "dashboard": 3,
+        "admin": 5,
+        "api": 4,
+        "auth": 5
+    }
+    
+    # Add criticality for found pages
+    for page in pages:
+        page_name = page.split('/')[-1].lower()
+        if page_name in critical_pages:
+            business_criticality[page_name] = critical_pages[page_name]
+    
+    return {
+        "weights": {
+            "error_weight": error_weight,
+            "business_weight": business_weight
+        },
+        "business_criticality": business_criticality
+    }
 
 
 class FlowScorer:
     """Scorer for user flows based on frequency, errors, and business criticality."""
 
-    def __init__(self, config: Union[str, Dict[str, Any]]):
+    def __init__(self, config_path_or_dict: Union[str, Dict[str, Any]], flows_dir: Optional[str] = None):
         """Initialize the scorer with configuration.
         
         Args:
-            config: Either a path to a YAML config file or a dictionary containing the config
+            config_path_or_dict: Path to YAML config file or dict with config data.
+            flows_dir: Optional directory containing flow files to analyze.
+                      If provided and config doesn't exist, will generate config from flows.
         """
-        if isinstance(config, (str, Path)):
-            with open(config, 'r') as f:
-                config_data = yaml.safe_load(f)
+        if isinstance(config_path_or_dict, str):
+            config_path = Path(config_path_or_dict)
+            if not config_path.exists():
+                # Generate config from flows if directory provided
+                config_data = get_default_config(flows_dir)
+                # Ensure parent directory exists
+                config_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(config_path, 'w') as f:
+                    yaml.dump(config_data, f, default_flow_style=False)
+                print(f"Created default configuration at {config_path}")
+                print("Please edit the configuration file to customize weights and criticality values.")
+            else:
+                with open(config_path) as f:
+                    config_data = yaml.safe_load(f)
         else:
-            config_data = config
-            
-        self.weights = config_data.get("weights", {
-            "error_weight": 2.0,
-            "business_weight": 1.5
-        })
-        self.business_criticality = config_data.get("business_criticality", {
-            "default": 2
-        })
-        # Store the full config for saving later
+            config_data = config_path_or_dict
+        
         self.config = config_data
+        self.weights = config_data["weights"]
+        self.business_criticality = config_data["business_criticality"]
 
     def get_business_criticality(self, page_url: str) -> float:
         """Get business criticality score for a page.

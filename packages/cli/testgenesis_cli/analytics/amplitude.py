@@ -16,7 +16,7 @@ from rich.table import Table
 
 from testgenesis_dsl import Action, TestFlow
 from testgenesis_dsl.generators import playwright, cypress, generate_test_code
-from .scorer import FlowScorer, save_config
+from .scorer import FlowScorer, save_config, get_default_config
 
 
 console = Console()
@@ -250,81 +250,196 @@ def extract_flows(
 
 
 @amplitude.group()
-def config() -> None:
-    """Manage flow scoring configuration."""
+def config():
+    """Manage configuration for flow scoring."""
     pass
 
 @config.command()
-@click.option("--weight-name", type=click.Choice(["error_weight", "business_weight"]), required=True)
-@click.option("--value", type=float, required=True)
-@click.option("--config-path", default="config.yaml", help="Path to configuration file")
-def set_weight(weight_name: str, value: float, config_path: str) -> None:
-    """Set a weight value in the configuration."""
-    scorer = FlowScorer(config_path)
-    scorer.weights[weight_name] = value
-    save_config(scorer.config, config_path)
-    console.print(f"[green]Updated {weight_name} to {value}[/green]")
-
-@config.command()
-@click.option("--page", required=True)
-@click.option("--value", type=float, required=True)
-@click.option("--config-path", default="config.yaml", help="Path to configuration file")
-def set_criticality(page: str, value: float, config_path: str) -> None:
-    """Set business criticality for a page."""
-    scorer = FlowScorer(config_path)
-    scorer.business_criticality[page.lower()] = value
-    save_config(scorer.config, config_path)
-    console.print(f"[green]Updated criticality for {page} to {value}[/green]")
-
-@config.command()
-@click.option("--config-path", default="config.yaml", help="Path to configuration file")
-def show(config_path: str) -> None:
+@click.option(
+    "--config-path",
+    type=click.Path(dir_okay=False),
+    required=True,
+    help="Path to configuration file",
+)
+def show(config_path: str):
     """Show current configuration."""
-    scorer = FlowScorer(config_path)
-    console.print(yaml.dump(scorer.config, default_flow_style=False))
+    try:
+        # Create default config if file doesn't exist
+        config_path = Path(config_path)
+        if not config_path.exists():
+            config_data = get_default_config()
+            # Ensure parent directory exists
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_path, 'w') as f:
+                yaml.dump(config_data, f, default_flow_style=False)
+            click.echo(f"Created default configuration at {config_path}")
+            click.echo("Please edit the configuration file to customize weights and criticality values.")
+        else:
+            with open(config_path) as f:
+                config_data = yaml.safe_load(f)
+        
+        # Print config as formatted YAML
+        click.echo(yaml.dump(config_data, default_flow_style=False))
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+@config.command()
+@click.option(
+    "--config-path",
+    type=click.Path(dir_okay=False),
+    required=True,
+    help="Path to configuration file",
+)
+@click.option(
+    "--weight-name",
+    type=click.Choice(["error_weight", "business_weight"]),
+    required=True,
+    help="Name of the weight to update",
+)
+@click.option(
+    "--value",
+    type=float,
+    required=True,
+    help="New value for the weight",
+)
+def set_weight(config_path: str, weight_name: str, value: float):
+    """Update a weight in the configuration."""
+    try:
+        # Load existing config or create default
+        config_path = Path(config_path)
+        if not config_path.exists():
+            config_data = get_default_config()
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_path, 'w') as f:
+                yaml.dump(config_data, f, default_flow_style=False)
+        else:
+            with open(config_path) as f:
+                config_data = yaml.safe_load(f)
+        
+        # Update the weight
+        config_data["weights"][weight_name] = value
+        
+        # Save updated config
+        with open(config_path, 'w') as f:
+            yaml.dump(config_data, f, default_flow_style=False)
+        
+        click.echo(f"Updated {weight_name} to {value}")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+@config.command()
+@click.option(
+    "--config-path",
+    type=click.Path(dir_okay=False),
+    required=True,
+    help="Path to configuration file",
+)
+@click.option(
+    "--page",
+    required=True,
+    help="Page URL to update criticality for",
+)
+@click.option(
+    "--value",
+    type=float,
+    required=True,
+    help="New criticality value for the page",
+)
+def set_criticality(config_path: str, page: str, value: float):
+    """Update criticality for a specific page."""
+    try:
+        # Load existing config or create default
+        config_path = Path(config_path)
+        if not config_path.exists():
+            config_data = get_default_config()
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_path, 'w') as f:
+                yaml.dump(config_data, f, default_flow_style=False)
+        else:
+            with open(config_path) as f:
+                config_data = yaml.safe_load(f)
+        
+        # Update the criticality
+        page_name = page.split('/')[-1].lower()
+        config_data["business_criticality"][page_name] = value
+        
+        # Save updated config
+        with open(config_path, 'w') as f:
+            yaml.dump(config_data, f, default_flow_style=False)
+        
+        click.echo(f"Updated criticality for {page_name} to {value}")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
 
 @amplitude.command()
-@click.option("--flows-dir", type=click.Path(exists=True), required=True, help="Directory containing flow files")
-@click.option("--config-path", default="config.yaml", help="Path to configuration file")
-@click.option("--output", type=click.Path(), help="Output file for scores (JSON)")
-def score_flows(flows_dir: str, config_path: str, output: Optional[str]) -> None:
+@click.option(
+    "--flows-dir",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    required=True,
+    help="Directory containing flow files to score",
+)
+@click.option(
+    "--config-path",
+    type=click.Path(dir_okay=False),
+    required=True,
+    help="Path to configuration file",
+)
+@click.option(
+    "--output",
+    type=click.Path(dir_okay=False),
+    help="Path to save scores as JSON",
+)
+def score_flows(flows_dir: str, config_path: str, output: Optional[str] = None):
     """Score user flows based on frequency, errors, and business criticality."""
-    scorer = FlowScorer(config_path)
-    flows_dir = Path(flows_dir)
-    results = []
-
-    for flow_file in flows_dir.glob("user_flow_*.json"):
-        with open(flow_file, 'r') as f:
-            flow = json.load(f)
-            score = scorer.calculate_score(flow)
-            results.append({
-                "flow_file": flow_file.name,
-                **score
-            })
-
-    # Sort results by score in descending order
-    results.sort(key=lambda x: x["score"], reverse=True)
-
-    if output:
-        with open(output, 'w') as f:
-            json.dump(results, f, indent=2)
-        console.print(f"[green]Saved scores to {output}[/green]")
-    else:
-        # Display results in a table
-        table = Table(title="Flow Scores")
-        table.add_column("Flow File")
-        table.add_column("Score")
-        table.add_column("Frequency")
-        table.add_column("Errors")
-        table.add_column("Criticality")
-
-        for result in results:
-            table.add_row(
-                result["flow_file"],
-                f"{result['score']:.2f}",
-                str(result["frequency"]),
-                str(result["error_count"]),
-                f"{result['business_criticality']:.1f}"
-            )
-
-        console.print(table)
+    try:
+        # Initialize scorer with flows directory for config generation
+        scorer = FlowScorer(config_path, flows_dir)
+        
+        # Score all flows in the directory
+        results = []
+        for flow_file in Path(flows_dir).glob("*.json"):
+            try:
+                with open(flow_file) as f:
+                    flow = json.load(f)
+                result = scorer.calculate_score(flow)
+                result["flow_file"] = flow_file.name
+                results.append(result)
+            except Exception as e:
+                click.echo(f"Warning: Error processing {flow_file}: {e}", err=True)
+                continue
+        
+        # Sort results by score
+        results.sort(key=lambda x: x["score"], reverse=True)
+        
+        if output:
+            # Save results to file
+            with open(output, 'w') as f:
+                json.dump(results, f, indent=2)
+            click.echo(f"Saved scores to {output}")
+        else:
+            # Display results in a table
+            table = Table(title="Flow Scores")
+            table.add_column("Flow File", style="cyan")
+            table.add_column("Score", justify="right", style="green")
+            table.add_column("Frequency", justify="right")
+            table.add_column("Errors", justify="right")
+            table.add_column("Criticality", justify="right")
+            
+            for result in results:
+                table.add_row(
+                    result["flow_file"],
+                    f"{result['score']:.1f}",
+                    str(result["frequency"]),
+                    str(result["error_count"]),
+                    f"{result['business_criticality']:.1f}"
+                )
+            
+            console = Console()
+            console.print(table)
+            
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
