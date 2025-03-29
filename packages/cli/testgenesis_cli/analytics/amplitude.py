@@ -349,16 +349,16 @@ def set_weight(config_path: str, weight_name: str, value: float):
 @click.option(
     "--page",
     required=True,
-    help="Page URL to update criticality for",
+    help="Page URL to update impact for",
 )
 @click.option(
     "--value",
     type=float,
     required=True,
-    help="New criticality value for the page",
+    help="New impact value for the page",
 )
-def set_criticality(config_path: str, page: str, value: float):
-    """Update criticality for a specific page."""
+def set_impact(config_path: str, page: str, value: float):
+    """Update business impact for a specific page."""
     try:
         # Load existing config or create default
         config_path = Path(config_path)
@@ -371,15 +371,15 @@ def set_criticality(config_path: str, page: str, value: float):
             with open(config_path) as f:
                 config_data = yaml.safe_load(f)
         
-        # Update the criticality
+        # Update the impact
         page_name = page.split('/')[-1].lower()
-        config_data["business_criticality"][page_name] = value
+        config_data["business_impact"][page_name] = value
         
         # Save updated config
         with open(config_path, 'w') as f:
             yaml.dump(config_data, f, default_flow_style=False)
         
-        click.echo(f"Updated criticality for {page_name} to {value}")
+        click.echo(f"Updated impact for {page_name} to {value}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise click.Abort()
@@ -435,20 +435,36 @@ def score_flows(flows_dir: str, config_path: str, output: Optional[str] = None):
             table.add_column("Flow File", style="cyan")
             table.add_column("Score", justify="right", style="green")
             table.add_column("Frequency", justify="right")
-            table.add_column("Errors", justify="right")
-            table.add_column("Criticality", justify="right")
+            table.add_column("Errors", justify="right", style="red")
+            table.add_column("Impact", justify="right")
             
             for result in results:
                 table.add_row(
                     result["flow_file"],
                     f"{result['score']:.1f}",
                     str(result["frequency"]),
-                    str(result["error_count"]),
-                    f"{result['business_criticality']:.1f}"
+                    str(result["unexpected_error_count"]),
+                    f"{result['business_impact']:.1f}"
                 )
             
             console = Console()
             console.print(table)
+            
+            # Print detailed error information
+            if any(result["error_details"] for result in results):
+                console.print("\nError Details:")
+                for result in results:
+                    if result["error_details"]:
+                        console.print(f"\nFlow: {result['flow_file']}")
+                        for error in result["error_details"]:
+                            if error["category"] == "unexpected":
+                                console.print(f"  - {error['type']} (Unexpected)")
+                                console.print(f"    Weight: {error['weight']}")
+                                console.print(f"    Description: {error['description']}")
+                                if error['data']:
+                                    console.print("    Error Data:")
+                                    for key, value in error['data'].items():
+                                        console.print(f"      {key}: {value}")
             
     except Exception as e:
         click.echo(f"Error: {e}", err=True)

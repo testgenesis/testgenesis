@@ -168,7 +168,7 @@ def mock_config():
             "error_weight": 2.0,
             "business_weight": 1.5
         },
-        "business_criticality": {
+        "business_impact": {
             "default": 2,
             "login": 5,
             "checkout": 4
@@ -201,10 +201,10 @@ def test_config_commands(tmp_path):
         config_data = yaml.safe_load(f)
         assert config_data["weights"]["error_weight"] == 2.0
         assert config_data["weights"]["business_weight"] == 1.5
-        assert config_data["business_criticality"]["default"] == 2
-        assert config_data["business_criticality"]["login"] == 5
-        assert config_data["business_criticality"]["checkout"] == 4
-        assert config_data["business_criticality"]["profile"] == 3
+        assert config_data["business_impact"]["default"] == 2
+        assert config_data["business_impact"]["login"] == 5
+        assert config_data["business_impact"]["checkout"] == 4
+        assert config_data["business_impact"]["profile"] == 3
     
     # Test set-weight command
     result = runner.invoke(amplitude, [
@@ -221,20 +221,20 @@ def test_config_commands(tmp_path):
         config_data = yaml.safe_load(f)
         assert config_data["weights"]["error_weight"] == 3.0
     
-    # Test set-criticality command
+    # Test set-impact command
     result = runner.invoke(amplitude, [
-        "config", "set-criticality",
+        "config", "set-impact",
         "--page", "profile",
         "--value", "3",
         "--config-path", str(config_file)
     ])
     assert result.exit_code == 0
-    assert "Updated criticality for profile to 3" in result.output
+    assert "Updated impact for profile to 3" in result.output
     
-    # Verify the criticality was updated
+    # Verify the impact was updated
     with open(config_file) as f:
         config_data = yaml.safe_load(f)
-        assert config_data["business_criticality"]["profile"] == 3
+        assert config_data["business_impact"]["profile"] == 3
 
 
 def test_score_flows_command(tmp_path):
@@ -248,14 +248,20 @@ def test_score_flows_command(tmp_path):
                 "type": "[Amplitude] Page Viewed",
                 "data": {"[Amplitude] Page URL": "/login"}
             },
-            {"type": "error", "target": "error1"}
+            {
+                "type": "error",
+                "data": {
+                    "error_code": "auth_service_error",
+                    "message": "Authentication service unavailable"
+                }
+            }
         ]
     }
     with open(flow_file, 'w') as f:
         json.dump(flow_data, f)
     
     # Test with non-existent config file
-    config_file = tmp_path / "config.yaml"
+    config_file = tmp_path / "testgenesis.config"
     runner = CliRunner()
     result = runner.invoke(amplitude, [
         "score-flows",
@@ -269,17 +275,18 @@ def test_score_flows_command(tmp_path):
     assert "Flow Scores" in result.output
     assert "user_flow_123.json" in result.output
     assert "10" in result.output  # frequency
-    assert "1" in result.output   # error count
-    assert "5.0" in result.output # business criticality
+    assert "0" in result.output   # expected_error_count
+    assert "1" in result.output   # unexpected_error_count
+    assert "5.0" in result.output # business impact
     
     # Verify config file was created with values based on flow data
     with open(config_file) as f:
         config = yaml.safe_load(f)
-        # With 1 flow and 1 error, error_frequency = 1.0 > 0.5, so error_weight should be 1.5
+        # With 1 flow and 1 unexpected error, error_frequency = 1.0 > 0.5, so error_weight should be 1.5
         assert config["weights"]["error_weight"] == 1.5
         assert config["weights"]["business_weight"] == 1.5
-        assert config["business_criticality"]["default"] == 2
-        assert config["business_criticality"]["login"] == 5
+        assert config["business_impact"]["default"] == 2
+        assert config["business_impact"]["login"] == 5
     
     # Test output to file
     output_file = tmp_path / "scores.json"
@@ -297,5 +304,6 @@ def test_score_flows_command(tmp_path):
         assert len(scores) == 1
         assert scores[0]["flow_file"] == "user_flow_123.json"
         assert scores[0]["frequency"] == 10
-        assert scores[0]["error_count"] == 1
-        assert scores[0]["business_criticality"] == 5
+        assert scores[0]["expected_error_count"] == 0
+        assert scores[0]["unexpected_error_count"] == 1
+        assert scores[0]["business_impact"] == 5
