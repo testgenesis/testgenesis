@@ -41,6 +41,13 @@ def create_test_flow(events: List[Dict[str, Any]], name: str) -> TestFlow:
                 target=event_properties.get("target", ""),
                 data=event_properties.get("data", {}),
             )
+        elif event_type.lower().endswith("_error") or event_type.lower().startswith("error"):
+            # Handle error events
+            action = Action(
+                type="error",
+                target=event_properties.get("target", ""),
+                data=event_properties,
+            )
         else:
             action = Action(
                 type=event_type,
@@ -261,8 +268,8 @@ def config():
 @click.option(
     "--config-path",
     type=click.Path(dir_okay=False),
-    required=True,
-    help="Path to configuration file",
+    default="testgenesis.config",
+    help="Path to configuration file (default: testgenesis.config)",
 )
 def show(config_path: str):
     """Show current configuration."""
@@ -291,8 +298,8 @@ def show(config_path: str):
 @click.option(
     "--config-path",
     type=click.Path(dir_okay=False),
-    required=True,
-    help="Path to configuration file",
+    default="testgenesis.config",
+    help="Path to configuration file (default: testgenesis.config)",
 )
 @click.option(
     "--weight-name",
@@ -336,8 +343,8 @@ def set_weight(config_path: str, weight_name: str, value: float):
 @click.option(
     "--config-path",
     type=click.Path(dir_okay=False),
-    required=True,
-    help="Path to configuration file",
+    default="testgenesis.config",
+    help="Path to configuration file (default: testgenesis.config)",
 )
 @click.option(
     "--page",
@@ -387,8 +394,8 @@ def set_criticality(config_path: str, page: str, value: float):
 @click.option(
     "--config-path",
     type=click.Path(dir_okay=False),
-    required=True,
-    help="Path to configuration file",
+    default="testgenesis.config",
+    help="Path to configuration file (default: testgenesis.config)",
 )
 @click.option(
     "--output",
