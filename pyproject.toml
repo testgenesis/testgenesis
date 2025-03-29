@@ -33,7 +33,11 @@ source = "vcs"
 raw-options = { version_scheme = "post-release" }
 
 [tool.hatch.build]
-packages = ["packages/cli/testgenesis_cli", "packages/dsl/testgenesis_dsl"]
+packages = [
+    "packages/cli/testgenesis_cli",
+    "packages/dsl/testgenesis_dsl",
+    "packages/core/testgenesis_core",
+]
 include = [
     "packages/*/py.typed",
 ]
