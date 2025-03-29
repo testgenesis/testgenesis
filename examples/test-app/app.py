@@ -53,7 +53,7 @@ def login():
         print(f"Login: Already logged in as {current_user.username}, redirecting to store")
         ui.navigate.to('/store')
         return
-    
+
     track_event('page_view', None, {'page': 'login'})
     create_login_page(set_current_user)
 
@@ -66,7 +66,7 @@ def register():
         print(f"Register: Already logged in as {current_user.username}, redirecting to store")
         ui.navigate.to('/store')
         return
-    
+
     track_event('page_view', None, {'page': 'register'})
     create_register_page()
 
@@ -80,7 +80,7 @@ def store():
         print("Store: No user found, redirecting to login")
         ui.navigate.to('/login')
         return
-    
+
     print(f"Store: Creating store page for user {current_user.username}")
     create_store_page(current_user.user_id)
 
@@ -91,7 +91,7 @@ def cart():
     if not current_user:
         ui.navigate.to('/login')
         return
-    
+
     create_cart_page(current_user.user_id)
 
 @ui.page('/profile')
@@ -101,7 +101,7 @@ def profile():
     if not current_user:
         ui.navigate.to('/login')
         return
-    
+
     create_profile_page(current_user)
 
 if __name__ in {"__main__", "__mp_main__"}:
@@ -110,5 +110,5 @@ if __name__ in {"__main__", "__mp_main__"}:
         favicon='🛍️',
         dark=True,
         reload=False,  # Disable auto-reload to prevent state resets
-        port=8081,
-    ) 
+        port=8050,
+    )

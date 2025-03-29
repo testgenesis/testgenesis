@@ -103,11 +103,14 @@ def extract_user_flows(
     events = []
     with zipfile.ZipFile(io.BytesIO(response.content)) as zip_file:
         file_list = zip_file.namelist()
-        console.print(f"Processing {len(file_list)} event files...")
+        console.print(f"Processing {len(file_list)} event files from ZIP archive:")
+        for file_name in file_list:
+            console.print(f"  - {file_name}")
 
         for file_name in file_list:
             # Check if the file is a gzip file by name
             is_gzip_by_name = file_name.endswith('.gz')
+            console.print(f"Processing file: {file_name} (gzipped: {is_gzip_by_name})")
 
             with zip_file.open(file_name) as file:
                 try:
