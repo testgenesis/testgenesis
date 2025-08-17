@@ -94,9 +94,20 @@ class PlaywrightTestRunner:
     async def setup_playwright(self) -> bool:
         """Install Playwright browsers if needed."""
         try:
-            # Check if playwright is available and install browsers
+            # Install playwright python package and browsers
             result = subprocess.run(
-                ["npx", "playwright", "install", "chromium"],
+                ["uv", "add", "playwright"],
+                cwd=self.test_dir,
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            if result.returncode != 0:
+                return False
+            
+            # Install browsers using Python playwright
+            result = subprocess.run(
+                ["uv", "run", "playwright", "install", "chromium"],
                 cwd=self.test_dir,
                 capture_output=True,
                 text=True,
@@ -107,18 +118,18 @@ class PlaywrightTestRunner:
             return False
 
     async def run_test(self, test_file: Path, timeout: int = 60) -> dict[str, Any]:
-        """Run a Playwright test and return results."""
+        """Run a Python Playwright test and return results."""
         try:
-            # Run the Playwright test
+            # Run the Python Playwright test
             result = subprocess.run(
-                ["npx", "playwright", "test", str(test_file), "--reporter=json"],
+                ["uv", "run", "python", str(test_file)],
                 cwd=self.test_dir,
                 capture_output=True,
                 text=True,
                 timeout=timeout
             )
 
-            # Parse results
+            # Parse results from Python test execution
             test_result = {
                 "success": result.returncode == 0,
                 "returncode": result.returncode,
@@ -126,35 +137,21 @@ class PlaywrightTestRunner:
                 "stderr": result.stderr,
                 "tests_passed": 0,
                 "tests_failed": 0,
-                "tests_total": 0
+                "tests_total": 1  # Always 1 test since we run a single Python function
             }
 
-            # Try to parse JSON reporter output
-            try:
-                if result.stdout:
-                    # Look for JSON in stdout
-                    lines = result.stdout.split('\n')
-                    for line in lines:
-                        if line.strip().startswith('{') and '"tests"' in line:
-                            json_result = json.loads(line.strip())
-                            if "stats" in json_result:
-                                stats = json_result["stats"]
-                                test_result["tests_passed"] = stats.get("passed", 0)
-                                test_result["tests_failed"] = stats.get("failed", 0)
-                                test_result["tests_total"] = stats.get("total", 0)
-                            break
-            except json.JSONDecodeError:
-                pass
+            # Determine test results based on return code and output
+            if result.returncode == 0:
+                test_result["tests_passed"] = 1
+                test_result["tests_failed"] = 0
+            else:
+                test_result["tests_passed"] = 0
+                test_result["tests_failed"] = 1
 
-            # If JSON parsing failed, try to extract info from text output
-            if test_result["tests_total"] == 0:
-                stdout_lower = result.stdout.lower()
-                if "passing" in stdout_lower or "passed" in stdout_lower:
-                    test_result["tests_passed"] = 1
-                    test_result["tests_total"] = 1
-                elif "failing" in stdout_lower or "failed" in stdout_lower:
-                    test_result["tests_failed"] = 1
-                    test_result["tests_total"] = 1
+            # Look for success indicators in output
+            if "✅ Test passed successfully!" in result.stdout:
+                test_result["tests_passed"] = 1
+                test_result["tests_failed"] = 0
 
             return test_result
 
@@ -229,22 +226,23 @@ async def test_true_e2e_workflow_execution(test_app_dir, real_amplitude_flows):
             # Give the app a moment to fully initialize
             await asyncio.sleep(2)
 
-            # Step 2: Create package.json for Playwright
-            package_json = {
-                "name": "generated-e2e-tests",
-                "version": "1.0.0",
-                "devDependencies": {
-                    "@playwright/test": "^1.48.0"
-                }
-            }
+            # Step 2: Initialize project and install Python Playwright
+            print("Setting up project...")
+            init_result = subprocess.run(
+                ["uv", "init", "--no-readme"],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if init_result.returncode != 0:
+                pytest.skip("Could not initialize project")
 
-            with open(temp_path / "package.json", "w") as f:
-                json.dump(package_json, f, indent=2)
-
-            # Step 3: Install Playwright
+            # Step 3: Install Playwright using uv
             print("Installing Playwright...")
             install_result = subprocess.run(
-                ["npm", "install"],
+                ["uv", "add", "playwright"],
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
@@ -265,30 +263,44 @@ async def test_true_e2e_workflow_execution(test_app_dir, real_amplitude_flows):
                     page_path = action["data"].get("[Amplitude] Page Path", "/login")
                     break
 
-            # Step 5: Generate a simple Playwright test
+            # Step 5: Generate a simple Python Playwright test
             test_content = f'''
-import {{ test, expect }} from '@playwright/test';
+import asyncio
+from playwright.async_api import async_playwright
 
-test('generated test from flow {best_flow["name"]}', async ({{ page }}) => {{
-  // Navigate to the page from flow data
-  await page.goto('{app_manager.base_url}{page_path}', {{ waitUntil: 'networkidle' }});
-  
-  // Wait for page to load
-  await page.waitForLoadState('domcontentloaded');
-  
-  // Basic verification that page loaded
-  const title = await page.title();
-  console.log('Page title:', title);
-  
-  // Verify we can interact with the page
-  expect(title).toBeTruthy();
-  
-  // Take a screenshot for debugging
-  await page.screenshot({{ path: 'test-result.png' }});
-}});
+async def test_generated_from_flow_{best_flow["name"].replace("user_flow_", "")}():
+    """Generated test from flow {best_flow["name"]}"""
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        
+        try:
+            # Navigate to the page from flow data
+            await page.goto('{app_manager.base_url}{page_path}', wait_until='networkidle')
+            
+            # Wait for page to load
+            await page.wait_for_load_state('domcontentloaded')
+            
+            # Basic verification that page loaded
+            title = await page.title()
+            print(f'Page title: {{title}}')
+            
+            # Verify we can interact with the page
+            assert title is not None and len(title) > 0
+            
+            # Take a screenshot for debugging
+            await page.screenshot(path='test-result.png')
+            
+            print("✅ Test passed successfully!")
+            
+        finally:
+            await browser.close()
+
+if __name__ == "__main__":
+    asyncio.run(test_generated_from_flow_{best_flow["name"].replace("user_flow_", "")}())
 '''
 
-            test_file = temp_path / "generated_test.spec.js"
+            test_file = temp_path / "generated_test.py"
             test_file.write_text(test_content)
 
             print(f"Generated test for path: {page_path}")
@@ -349,41 +361,55 @@ async def test_e2e_simple_navigation_test():
 
             await asyncio.sleep(2)
 
-            # Create a simple manual test
+            # Create a simple Python test
             simple_test_content = f'''
-import {{ test, expect }} from '@playwright/test';
+import asyncio
+from playwright.async_api import async_playwright
 
-test('simple navigation test', async ({{ page }}) => {{
-  // Navigate to the app
-  await page.goto('{app_manager.base_url}/', {{ waitUntil: 'networkidle' }});
-  
-  // Wait for page to load
-  await page.waitForLoadState('domcontentloaded');
-  
-  // Check that we got some response (even if redirected)
-  const title = await page.title();
-  console.log('Page title:', title);
-  
-  // Just verify we can load the page without major errors
-  expect(title).toBeTruthy();
-}});
+async def simple_navigation_test():
+    """Simple navigation test"""
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        
+        try:
+            # Navigate to the app
+            await page.goto('{app_manager.base_url}/', wait_until='networkidle')
+            
+            # Wait for page to load
+            await page.wait_for_load_state('domcontentloaded')
+            
+            # Check that we got some response (even if redirected)
+            title = await page.title()
+            print(f'Page title: {{title}}')
+            
+            # Just verify we can load the page without major errors
+            assert title is not None and len(title) > 0
+            
+            print("✅ Test passed successfully!")
+            
+        finally:
+            await browser.close()
+
+if __name__ == "__main__":
+    asyncio.run(simple_navigation_test())
 '''
 
-            # Create package.json
-            package_json = {
-                "name": "simple-e2e-test",
-                "version": "1.0.0",
-                "devDependencies": {
-                    "@playwright/test": "^1.48.0"
-                }
-            }
-
-            with open(temp_path / "package.json", "w") as f:
-                json.dump(package_json, f, indent=2)
+            # Initialize project and install Playwright  
+            init_result = subprocess.run(
+                ["uv", "init", "--no-readme"],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if init_result.returncode != 0:
+                pytest.skip("Could not initialize project")
 
             # Install Playwright
             install_result = subprocess.run(
-                ["npm", "install"],
+                ["uv", "add", "playwright"],
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
@@ -394,7 +420,7 @@ test('simple navigation test', async ({{ page }}) => {{
                 pytest.skip(f"Could not install Playwright: {install_result.stderr}")
 
             # Write the simple test
-            test_file = temp_path / "simple_test.spec.js"
+            test_file = temp_path / "simple_test.py"
             test_file.write_text(simple_test_content)
 
             # Run the test
@@ -420,46 +446,55 @@ test('simple navigation test', async ({{ page }}) => {{
 
 @pytest.mark.integration
 async def test_playwright_installation():
-    """Test that Playwright can be installed and basic setup works."""
+    """Test that Python Playwright can be installed and basic setup works."""
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        # Create package.json
-        package_json = {
-            "name": "playwright-install-test",
-            "version": "1.0.0",
-            "devDependencies": {
-                "@playwright/test": "^1.48.0"
-            }
-        }
-
-        with open(temp_path / "package.json", "w") as f:
-            json.dump(package_json, f, indent=2)
-
-        # Try to install
+        # Try to install directly using uv add
         try:
+            # Initialize a simple project
+            init_result = subprocess.run(
+                ["uv", "init", "--no-readme"],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if init_result.returncode != 0:
+                pytest.skip("Could not initialize project")
+            
+            # Add playwright dependency
             result = subprocess.run(
-                ["npm", "install"],
+                ["uv", "add", "playwright"],
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
                 timeout=120
             )
 
-            print(f"NPM install result: {result.returncode}")
+            print(f"uv add result: {result.returncode}")
             print(f"STDOUT: {result.stdout}")
             print(f"STDERR: {result.stderr}")
 
             # Should be able to install successfully
-            assert result.returncode == 0, "NPM install should succeed"
+            assert result.returncode == 0, "uv add should succeed"
 
-            # Check that playwright was installed
-            node_modules = temp_path / "node_modules" / "@playwright" / "test"
-            assert node_modules.exists(), "Playwright should be installed"
+            # Check that playwright was installed by trying to import it
+            import_result = subprocess.run(
+                ["uv", "run", "python", "-c", "import playwright; print('Playwright imported successfully')"],
+                cwd=temp_path,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            assert import_result.returncode == 0, "Should be able to import playwright"
+            assert "Playwright imported successfully" in import_result.stdout
 
-            print("✅ Playwright installation test passed!")
+            print("✅ Python Playwright installation test passed!")
 
         except subprocess.TimeoutExpired:
-            pytest.skip("NPM install took too long")
+            pytest.skip("uv add took too long")
         except Exception as e:
-            pytest.skip(f"NPM install failed: {e}")
+            pytest.skip(f"uv add failed: {e}")
