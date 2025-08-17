@@ -1,5 +1,30 @@
 # CLAUDE.md
 
+⚠️ **MANDATORY WORKFLOW - READ FIRST** ⚠️
+
+## AI Agent Requirements (MUST FOLLOW)
+
+### Before ANY Action:
+- [ ] Search YAMS first: `yams search "<query>" --limit 20`
+- [ ] Use YAMS for ALL codebase queries (never grep/find/rg)
+- [ ] Create 3-7 bullet checklist for multi-step processes
+
+### During Work:
+- [ ] Use `yams grep` instead of system grep/find/rg
+- [ ] Add ALL discoveries to YAMS with tags
+- [ ] Reference by YAMS hash in documentation
+
+### After Changes:
+- [ ] Re-index files: `yams add <file> --tags "code,working"`
+- [ ] Validate YAMS outcome in 1-2 lines
+
+### FORBIDDEN TOOLS:
+- ❌ System grep/find/rg for codebase queries
+- ❌ External search before YAMS search
+- ❌ File operations without YAMS indexing
+
+---
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
@@ -135,3 +160,19 @@ The project uses a monorepo structure with three main packages:
 - Always use uv to manage dependencies and to run python code.
 - When adding a package use `uv add` instead of `uv pip install`
 - Always make branch names descriptive to changes made
+
+---
+
+## Import YAMS Development Policies
+
+@/Users/ulver/yams/PROMPT-eng.md
+
+*The above import includes the complete YAMS-first development workflow and policies for all Claude Code sessions.*
+
+---
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
