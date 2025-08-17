@@ -118,3 +118,4 @@ def save_config(config: dict, config_path: str) -> None:
     """Save configuration to YAML file."""
     with open(config_path, 'w') as f:
         yaml.dump(config, f, default_flow_style=False)
+

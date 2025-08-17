@@ -15,47 +15,12 @@ from rich.console import Console
 from rich.table import Table
 
 from testgenesis_dsl import Action, TestFlow
+from testgenesis_core.analytics.amplitude import create_test_flow
 
 from .scorer import FlowScorer, get_default_config
 
 console = Console()
 
-
-def create_test_flow(events: list[dict[str, Any]], name: str) -> TestFlow:
-    """Create a test flow from a sequence of Amplitude events."""
-    actions: list[Action] = []
-    for event in events:
-        event_type = event.get("event_type", "")
-        event_properties = event.get("event_properties", {})
-
-        if event_type == "navigation":
-            action = Action(
-                type=event_type,
-                target=event_properties.get("path", ""),
-                data=event_properties,
-            )
-        elif event_type == "form":
-            action = Action(
-                type=event_type,
-                target=event_properties.get("target", ""),
-                data=event_properties.get("data", {}),
-            )
-        elif event_type.lower().endswith("_error") or event_type.lower().startswith("error"):
-            # Handle error events
-            action = Action(
-                type="error",
-                target=event_properties.get("target", ""),
-                data=event_properties,
-            )
-        else:
-            action = Action(
-                type=event_type,
-                target=event_properties.get("target", ""),
-                data=event_properties,
-            )
-        actions.append(action)
-
-    return TestFlow(name=name, actions=actions)
 
 
 def extract_user_flows(
@@ -495,3 +460,4 @@ def score_flows(flows_dir: str, config_path: str, output: str | None = None):
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise click.Abort()
+
