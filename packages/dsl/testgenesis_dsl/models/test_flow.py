@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -11,8 +11,8 @@ class Action:
 
     type: str
     target: str
-    data: Optional[Dict[str, Any]] = None
-    assertions: Optional[List[str]] = None
+    data: dict[str, Any] | None = None
+    assertions: list[str] | None = None
 
 
 @dataclass
@@ -20,9 +20,9 @@ class TestFlow:
     """Represents a sequence of user actions that form a test flow."""
 
     name: str
-    actions: List[Action]
-    description: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    actions: list[Action]
+    description: str | None = None
+    tags: list[str] = field(default_factory=list)
     frequency: int = 1
 
     def get_pattern(self) -> str:
@@ -55,6 +55,6 @@ class UserJourney:
     """Represents a collection of related test flows."""
 
     name: str
-    flows: List[TestFlow]
-    description: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    flows: list[TestFlow]
+    description: str | None = None
+    tags: list[str] = field(default_factory=list)

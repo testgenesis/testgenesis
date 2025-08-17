@@ -1,7 +1,5 @@
 """Test generation command."""
 
-from pathlib import Path
-
 import click
 from rich.console import Console
 
@@ -30,5 +28,5 @@ def generate(flow_path: str, framework: str, output: str) -> None:
         generate_test_code(flow_path, framework, output)
         console.print(f"[green]Generated {framework} test at: {output}[/green]")
     except Exception as e:
-        console.print(f"[red]Error generating test: {str(e)}[/red]")
+        console.print(f"[red]Error generating test: {e!s}[/red]")
         raise click.Abort()

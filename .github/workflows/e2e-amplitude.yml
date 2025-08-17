@@ -1,0 +1,115 @@
+name: E2E Amplitude Testing
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: 'Number of test iterations'
+        required: false
+        default: '3'
+      extract_flows:
+        description: 'Extract flows after generation'
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+  e2e-amplitude-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    
+    - name: Install TestGenesis
+      run: |
+        uv pip install -e ".[dev]"
+    
+    - name: Install test app dependencies
+      working-directory: examples/test-app
+      run: |
+        uv sync
+        uv pip install playwright
+        playwright install chromium
+        playwright install-deps
+    
+    - name: Start test application
+      working-directory: examples/test-app
+      run: |
+        nohup uv run python app.py &
+        echo $! > app.pid
+        sleep 5
+        curl -f http://localhost:8050 || exit 1
+    
+    - name: Generate Amplitude events
+      working-directory: examples/test-app
+      run: |
+        python e2e_amplitude_generator.py \
+          --base-url http://localhost:8050 \
+          --iterations ${{ github.event.inputs.iterations || '3' }} \
+          --headless \
+          --include-errors
+    
+    - name: Wait for Amplitude processing
+      run: sleep 15
+    
+    - name: Extract flows from Amplitude
+      if: ${{ github.event.inputs.extract_flows != 'false' }}
+      working-directory: examples/test-app
+      env:
+        AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
+      run: |
+        testgenesis amplitude extract-flows \
+          --api-key $AMPLITUDE_API_KEY \
+          --start-date $(date -d "yesterday" +%Y-%m-%d) \
+          --end-date $(date +%Y-%m-%d) \
+          --output-dir ./test_flows
+    
+    - name: Generate test code
+      if: ${{ github.event.inputs.extract_flows != 'false' }}
+      working-directory: examples/test-app
+      run: |
+        mkdir -p tests/generated
+        for flow in test_flows/*.json; do
+          if [ -f "$flow" ]; then
+            testgenesis generate "$flow" \
+              --framework playwright \
+              --output "tests/generated/$(basename $flow .json).spec.ts"
+          fi
+        done
+    
+    - name: Upload generated tests
+      if: ${{ github.event.inputs.extract_flows != 'false' }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: generated-tests
+        path: examples/test-app/tests/generated/
+    
+    - name: Upload flow data
+      if: ${{ github.event.inputs.extract_flows != 'false' }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: amplitude-flows
+        path: examples/test-app/test_flows/
+    
+    - name: Stop test application
+      if: always()
+      working-directory: examples/test-app
+      run: |
+        if [ -f app.pid ]; then
+          kill $(cat app.pid) || true
+          rm app.pid
+        fi

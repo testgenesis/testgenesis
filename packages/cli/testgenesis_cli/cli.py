@@ -20,4 +20,4 @@ cli.add_command(generate)
 cli.add_command(amplitude)
 
 if __name__ == "__main__":
-    cli() 
+    cli()

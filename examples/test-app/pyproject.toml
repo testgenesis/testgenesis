@@ -1,17 +1,29 @@
-[project]
-name = "testgenesis-test-app"
-version = "0.1.0"
-description = "A simple NiceGUI application with Amplitude tracking"
-requires-python = ">=3.10"
-dependencies = [
-    "nicegui>=1.4.12",
-    "python-dotenv>=1.0.0",
-    "bcrypt>=4.1.2",
-]
-
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[project]
+name = "test-app"
+version = "0.1.0"
+description = "Test application for TestGenesis"
+requires-python = ">=3.8"
+dependencies = [
+    "nicegui",
+    "python-dotenv",
+    "pytest",
+    "pytest-watch",
+    "playwright>=1.48.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
 [tool.hatch.build.targets.wheel]
 packages = ["."] 
+
+[dependency-groups]
+dev = [
+    "pytest-watch>=4.2.0",
+]

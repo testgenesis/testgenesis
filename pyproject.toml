@@ -13,6 +13,11 @@ dependencies = [
     "amplitude-analytics>=1.1.0",
     "requests>=2.32.3",
     "pyyaml>=6.0.2",
+    "pytest-asyncio>=1.1.0",
+    "urllib3>=2.5.0",
+    "certifi>=2025.8.3",
+    "setuptools>=80.9.0",
+    "wheel>=0.45.1",
 ]
 optional-dependencies = {dev = [
     "pytest>=7.0.0",
@@ -33,7 +38,11 @@ source = "vcs"
 raw-options = { version_scheme = "post-release" }
 
 [tool.hatch.build]
-packages = ["packages/cli/testgenesis_cli", "packages/dsl/testgenesis_dsl"]
+packages = [
+    "packages/cli/testgenesis_cli",
+    "packages/dsl/testgenesis_dsl",
+    "packages/core/testgenesis_core",
+]
 include = [
     "packages/*/py.typed",
 ]
@@ -103,4 +112,6 @@ dev = [
     "pytest>=8.3.5",
     "pytest-watch>=4.2.0",
     "ruff>=0.11.0",
+    "types-pyyaml>=6.0.12.20250809",
+    "types-requests>=2.32.4.20250809",
 ]

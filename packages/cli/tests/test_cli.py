@@ -39,4 +39,4 @@ def test_generate_command_help():
     assert result.exit_code == 0
     assert "Generate test code from a test flow file" in result.output
     assert "--framework" in result.output
-    assert "--output" in result.output 
+    assert "--output" in result.output

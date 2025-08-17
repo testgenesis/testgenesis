@@ -1,11 +1,9 @@
 """Playwright test code generator."""
 
-from pathlib import Path
-from typing import Any, Dict
-
 import json
+from pathlib import Path
 
-from ..models.test_flow import TestFlow, Action
+from ..models.test_flow import Action, TestFlow
 
 
 def generate_playwright_test(flow_path: str, output_path: str) -> None:
@@ -17,7 +15,7 @@ def generate_playwright_test(flow_path: str, output_path: str) -> None:
             type=action["type"],
             target=action["target"],
             data=action.get("data"),
-            assertions=action.get("assertions", [])
+            assertions=action.get("assertions", []),
         )
         for action in flow_data["actions"]
     ]
@@ -45,7 +43,7 @@ test('{flow.name}', async ({{ page }}) => {{
         elif action.type == "form":
             if action.data:
                 for field, value in action.data.items():
-                    selector = f"{action.target} [name=\"{field}\"]"
+                    selector = f'{action.target} [name="{field}"]'
                     code += f"    await page.fill('{selector}', '{value}');\n"
             code += f"    await page.click('{action.target}');\n"
             if action.assertions:

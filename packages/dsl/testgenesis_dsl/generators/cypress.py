@@ -1,11 +1,9 @@
 """Cypress test code generator."""
 
-from pathlib import Path
-from typing import Any, Dict
-
 import json
+from pathlib import Path
 
-from ..models.test_flow import TestFlow, Action
+from ..models.test_flow import Action, TestFlow
 
 
 def generate_cypress_test(flow_path: str, output_path: str) -> None:
@@ -36,7 +34,7 @@ describe('{flow.name}', () => {{
         elif action.type == "form":
             if action.data:
                 for field, value in action.data.items():
-                    selector = f"{action.target} [name=\"{field}\"]"
+                    selector = f'{action.target} [name="{field}"]'
                     code += f"    cy.get('{selector}').type('{value}');\n"
             code += f"    cy.get('{action.target}').click();\n"
             if action.assertions:
