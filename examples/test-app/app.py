@@ -281,10 +281,12 @@ def checkout():
     create_checkout_page()
 
 if __name__ in {"__main__", "__mp_main__"}:
+    import os
+    port = int(os.environ.get('PORT', 8050))
     ui.run(
         title='TestGenesis Test App',
         favicon='🛍️',
         dark=True,
         reload=False,  # Disable auto-reload to prevent state resets
-        port=8050,
+        port=port,
     )

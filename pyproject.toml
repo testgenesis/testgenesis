@@ -13,6 +13,7 @@ dependencies = [
     "amplitude-analytics>=1.1.0",
     "requests>=2.32.3",
     "pyyaml>=6.0.2",
+    "pytest-asyncio>=1.1.0",
 ]
 optional-dependencies = {dev = [
     "pytest>=7.0.0",
