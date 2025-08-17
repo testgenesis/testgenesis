@@ -1,1 +1,1 @@
-"""Test package for testgenesis-core.""" 
+"""Test package for testgenesis-core."""

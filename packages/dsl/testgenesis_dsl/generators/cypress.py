@@ -1,11 +1,9 @@
 """Cypress test code generator."""
 
-from pathlib import Path
-from typing import Any, Dict
-
 import json
+from pathlib import Path
 
-from ..models.test_flow import TestFlow, Action
+from ..models.test_flow import Action, TestFlow
 
 
 def generate_cypress_test(flow_path: str, output_path: str) -> None:

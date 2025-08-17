@@ -13,13 +13,13 @@ def flow_data(draw):
     """
     frequency = draw(st.integers(min_value=0, max_value=10))
     num_actions = draw(st.integers(min_value=0, max_value=3))
-    
+
     action_types = [
         "[Amplitude] Page Viewed",
         "error",
         "click"
     ]
-    
+
     pages = [
         "/login",
         "/checkout",
@@ -27,7 +27,7 @@ def flow_data(draw):
         "/settings",
         "/unknown"
     ]
-    
+
     actions = []
     for _ in range(num_actions):
         action_type = draw(st.sampled_from(action_types))
@@ -41,7 +41,7 @@ def flow_data(draw):
                 "type": action_type,
                 "target": f"{action_type}_{draw(st.integers(min_value=1, max_value=3))}"
             })
-    
+
     return {
         "frequency": frequency,
         "actions": actions
@@ -58,17 +58,17 @@ def config_data(draw):
     """
     error_weight = draw(st.floats(min_value=0.0, max_value=5.0))
     business_weight = draw(st.floats(min_value=0.0, max_value=5.0))
-    
+
     pages = ["login", "checkout", "profile", "settings"]
     criticality = {
         "default": draw(st.floats(min_value=0.0, max_value=3.0)),
         **{page: draw(st.floats(min_value=0.0, max_value=3.0)) for page in pages}
     }
-    
+
     return {
         "weights": {
             "error_weight": error_weight,
             "business_weight": business_weight
         },
         "business_criticality": criticality
-    } 
+    }

@@ -1,8 +1,9 @@
 """Test configuration for testgenesis-core."""
 
+from pathlib import Path
+
 import pytest
 import yaml
-from pathlib import Path
 
 
 @pytest.fixture
@@ -26,9 +27,9 @@ def config_file(tmp_path):
             "profile": 3
         }
     }
-    
+
     config_path = tmp_path / "test_config.yaml"
     with open(config_path, "w") as f:
         yaml.dump(config, f)
-    
-    return config_path 
+
+    return config_path

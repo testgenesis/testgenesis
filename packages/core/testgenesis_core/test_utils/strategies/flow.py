@@ -2,6 +2,7 @@
 
 from hypothesis import strategies as st
 
+
 def flow_data():
     """Generate test flow data."""
     return st.fixed_dictionaries({
@@ -31,4 +32,4 @@ def config_data():
             "checkout": st.integers(min_value=1, max_value=5),
             "profile": st.integers(min_value=1, max_value=5)
         })
-    }) 
+    })

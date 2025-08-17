@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv",
     "pytest",
     "pytest-watch",
+    "playwright>=1.48.0",
 ]
 
 [tool.pytest.ini_options]

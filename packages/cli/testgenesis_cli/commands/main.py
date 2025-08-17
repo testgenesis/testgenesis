@@ -1,6 +1,5 @@
 """TestGenesis CLI main entry point."""
 
-from typing import NoReturn
 
 import click
 

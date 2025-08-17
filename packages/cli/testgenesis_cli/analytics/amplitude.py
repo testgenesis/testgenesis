@@ -1,30 +1,29 @@
 """Amplitude analytics integration."""
 
-import json
-import io
-import zipfile
 import gzip
-import requests
-import yaml
+import io
+import json
+import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import click
+import requests
+import yaml
 from rich.console import Console
 from rich.table import Table
 
 from testgenesis_dsl import Action, TestFlow
-from testgenesis_dsl.generators import playwright, cypress, generate_test_code
-from .scorer import FlowScorer, save_config, get_default_config
 
+from .scorer import FlowScorer, get_default_config
 
 console = Console()
 
 
-def create_test_flow(events: List[Dict[str, Any]], name: str) -> TestFlow:
+def create_test_flow(events: list[dict[str, Any]], name: str) -> TestFlow:
     """Create a test flow from a sequence of Amplitude events."""
-    actions: List[Action] = []
+    actions: list[Action] = []
     for event in events:
         event_type = event.get("event_type", "")
         event_properties = event.get("event_properties", {})
@@ -65,9 +64,9 @@ def extract_user_flows(
     start_date: datetime,
     end_date: datetime,
     min_frequency: int = 5,
-    output_dir: Optional[Path] = None,
+    output_dir: Path | None = None,
     region: str = "eu"
-) -> List[TestFlow]:
+) -> list[TestFlow]:
     """Extract common user flows from Amplitude analytics using the Export API."""
     # Format dates for Amplitude Export API (YYYYMMDDTHH format)
     start_str = start_date.strftime("%Y%m%dT%H")
@@ -146,7 +145,7 @@ def extract_user_flows(
                             try:
                                 line = line.decode('utf-8')
                             except UnicodeDecodeError:
-                                console.print(f"[yellow]Warning: Cannot decode line as UTF-8, skipping.[/yellow]")
+                                console.print("[yellow]Warning: Cannot decode line as UTF-8, skipping.[/yellow]")
                                 continue
                         if line.strip():  # Skip empty lines
                             try:
@@ -162,7 +161,7 @@ def extract_user_flows(
     console.print(f"Found {len(events)} events.")
 
     # Group events by session
-    sessions: Dict[str, List[Dict[str, Any]]] = {}
+    sessions: dict[str, list[dict[str, Any]]] = {}
     for event in events:
         session_id = str(event.get("session_id", ""))  # Convert to string to be safe
         if not session_id:
@@ -176,7 +175,7 @@ def extract_user_flows(
         sessions[session_id].sort(key=lambda e: e.get("client_event_time", ""))
 
     # Find common flows (simplified for example)
-    flows: List[TestFlow] = []
+    flows: list[TestFlow] = []
     for session_id, session_events in sessions.items():
         if len(session_events) >= min_frequency:
             flow = create_test_flow(session_events, f"user_flow_{session_id}")
@@ -223,10 +222,10 @@ def amplitude() -> None:
 def extract_flows(
     api_key: str,
     secret_key: str,
-    start_date: Optional[datetime],
-    end_date: Optional[datetime],
+    start_date: datetime | None,
+    end_date: datetime | None,
     min_frequency: int,
-    output_dir: Optional[str],
+    output_dir: str | None,
     region: str,
 ) -> None:
     """Extract common user flows from Amplitude analytics."""
@@ -287,7 +286,7 @@ def show(config_path: str):
         else:
             with open(config_path) as f:
                 config_data = yaml.safe_load(f)
-        
+
         # Print config as formatted YAML
         click.echo(yaml.dump(config_data, default_flow_style=False))
     except Exception as e:
@@ -326,14 +325,14 @@ def set_weight(config_path: str, weight_name: str, value: float):
         else:
             with open(config_path) as f:
                 config_data = yaml.safe_load(f)
-        
+
         # Update the weight
         config_data["weights"][weight_name] = value
-        
+
         # Save updated config
         with open(config_path, 'w') as f:
             yaml.dump(config_data, f, default_flow_style=False)
-        
+
         click.echo(f"Updated {weight_name} to {value}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -370,15 +369,15 @@ def set_impact(config_path: str, page: str, value: float):
         else:
             with open(config_path) as f:
                 config_data = yaml.safe_load(f)
-        
+
         # Update the impact
         page_name = page.split('/')[-1].lower()
         config_data["business_impact"][page_name] = value
-        
+
         # Save updated config
         with open(config_path, 'w') as f:
             yaml.dump(config_data, f, default_flow_style=False)
-        
+
         click.echo(f"Updated impact for {page_name} to {value}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
@@ -402,28 +401,54 @@ def set_impact(config_path: str, page: str, value: float):
     type=click.Path(dir_okay=False),
     help="Path to save scores as JSON",
 )
-def score_flows(flows_dir: str, config_path: str, output: Optional[str] = None):
-    """Score user flows based on frequency, errors, and business criticality."""
+def score_flows(flows_dir: str, config_path: str, output: str | None = None):
+    """Score user flows based on frequency, errors, and business impact."""
     try:
+        # Debug: Print config file path
+        click.echo(f"\nDebug: Using config file: {config_path}")
+
         # Initialize scorer with flows directory for config generation
         scorer = FlowScorer(config_path, flows_dir)
-        
+
+        # Debug: Print scorer configuration
+        click.echo("\nDebug: Scorer Configuration:")
+        click.echo(f"Weights: {scorer.weights}")
+        click.echo(f"Business Impact: {scorer.business_impact}")
+
         # Score all flows in the directory
         results = []
         for flow_file in Path(flows_dir).glob("*.json"):
             try:
+                click.echo(f"\nDebug: Processing flow file: {flow_file}")
                 with open(flow_file) as f:
                     flow = json.load(f)
+
+                # Debug: Print flow data
+                click.echo("Debug: Flow Data:")
+                click.echo(f"Name: {flow.get('name', 'unnamed')}")
+                click.echo(f"Frequency: {flow.get('frequency', 0)}")
+                click.echo(f"Actions: {len(flow.get('actions', []))}")
+
                 result = scorer.calculate_score(flow)
+
+                # Debug: Print scoring result
+                click.echo("\nDebug: Scoring Result:")
+                click.echo(f"Score: {result.get('score', 'N/A')}")
+                click.echo(f"Frequency: {result.get('frequency', 'N/A')}")
+                click.echo(f"Expected Errors: {result.get('expected_error_count', 'N/A')}")
+                click.echo(f"Unexpected Errors: {result.get('unexpected_error_count', 'N/A')}")
+                click.echo(f"Business Impact: {result.get('business_impact', 'N/A')}")
+                click.echo(f"All Keys: {list(result.keys())}")
+
                 result["flow_file"] = flow_file.name
                 results.append(result)
             except Exception as e:
                 click.echo(f"Warning: Error processing {flow_file}: {e}", err=True)
                 continue
-        
+
         # Sort results by score
         results.sort(key=lambda x: x["score"], reverse=True)
-        
+
         if output:
             # Save results to file
             with open(output, 'w') as f:
@@ -437,7 +462,7 @@ def score_flows(flows_dir: str, config_path: str, output: Optional[str] = None):
             table.add_column("Frequency", justify="right")
             table.add_column("Errors", justify="right", style="red")
             table.add_column("Impact", justify="right")
-            
+
             for result in results:
                 table.add_row(
                     result["flow_file"],
@@ -446,10 +471,10 @@ def score_flows(flows_dir: str, config_path: str, output: Optional[str] = None):
                     str(result["unexpected_error_count"]),
                     f"{result['business_impact']:.1f}"
                 )
-            
+
             console = Console()
             console.print(table)
-            
+
             # Print detailed error information
             if any(result["error_details"] for result in results):
                 console.print("\nError Details:")
@@ -461,11 +486,12 @@ def score_flows(flows_dir: str, config_path: str, output: Optional[str] = None):
                                 console.print(f"  - {error['type']} (Unexpected)")
                                 console.print(f"    Weight: {error['weight']}")
                                 console.print(f"    Description: {error['description']}")
-                                if error['data']:
-                                    console.print("    Error Data:")
-                                    for key, value in error['data'].items():
-                                        console.print(f"      {key}: {value}")
-            
+                                console.print(f"    Message: {error['message']}")
+                                console.print(f"    Code: {error['error_code']}")
+                                console.print(f"    Type: {error['error_type']}")
+                                console.print(f"    Page: {error['page']}")
+                                console.print(f"    Time: {error['timestamp']}")
+
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise click.Abort()

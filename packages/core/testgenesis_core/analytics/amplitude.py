@@ -1,23 +1,21 @@
 """Core Amplitude analytics integration."""
 
-import json
-import io
-import zipfile
 import gzip
-import requests
-import yaml
+import io
+import json
+import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
+import requests
 
 from testgenesis_dsl import Action, TestFlow
-from testgenesis_dsl.generators import playwright, cypress, generate_test_code
-from .scorer import FlowScorer, save_config, get_default_config
 
 
-def create_test_flow(events: List[Dict[str, Any]], name: str) -> TestFlow:
+def create_test_flow(events: list[dict[str, Any]], name: str) -> TestFlow:
     """Create a test flow from a sequence of Amplitude events."""
-    actions: List[Action] = []
+    actions: list[Action] = []
     for event in events:
         event_type = event.get("event_type", "")
         event_properties = event.get("event_properties", {})
@@ -58,9 +56,9 @@ def extract_user_flows(
     start_date: datetime,
     end_date: datetime,
     min_frequency: int = 5,
-    output_dir: Optional[Path] = None,
+    output_dir: Path | None = None,
     region: str = "eu"
-) -> List[TestFlow]:
+) -> list[TestFlow]:
     """Extract common user flows from Amplitude analytics using the Export API."""
     # Format dates for Amplitude Export API (YYYYMMDDTHH format)
     start_str = start_date.strftime("%Y%m%dT%H")
@@ -118,7 +116,7 @@ def extract_user_flows(
                             lines = decompressed_content.splitlines()
                         else:
                             lines = file_content.splitlines()
-                    except Exception as e:
+                    except Exception:
                         # Fall back to reading file directly
                         file.seek(0)
                         lines = file.readlines()
@@ -139,7 +137,7 @@ def extract_user_flows(
                     continue
 
     # Group events by session
-    sessions: Dict[str, List[Dict[str, Any]]] = {}
+    sessions: dict[str, list[dict[str, Any]]] = {}
     for event in events:
         session_id = str(event.get("session_id", ""))  # Convert to string to be safe
         if not session_id:
@@ -153,7 +151,7 @@ def extract_user_flows(
         sessions[session_id].sort(key=lambda e: e.get("client_event_time", ""))
 
     # Find common flows
-    flows: List[TestFlow] = []
+    flows: list[TestFlow] = []
     for session_id, session_events in sessions.items():
         if len(session_events) >= min_frequency:
             flow = create_test_flow(session_events, f"user_flow_{session_id}")
@@ -177,4 +175,4 @@ def get_yesterday() -> datetime:
 
 def get_today() -> datetime:
     """Get today's date at 23:59:59."""
-    return datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999) 
+    return datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)

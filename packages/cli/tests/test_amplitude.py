@@ -1,19 +1,15 @@
 """Tests for Amplitude CLI commands."""
 
-from datetime import datetime
-import json
 import io
+import json
 import zipfile
-import gzip
-import yaml
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 from testgenesis_cli.analytics.amplitude import amplitude
-from testgenesis_cli.analytics.scorer import FlowScorer
 
 
 @pytest.fixture
@@ -49,7 +45,7 @@ def test_extract_flows_cli(mock_requests_get, tmp_path, mock_amplitude_events):
     with zipfile.ZipFile(zip_buffer, "w") as zip_file:
         event_data = "\n".join(json.dumps(event) for event in mock_amplitude_events)
         zip_file.writestr("events.json", event_data)
-    
+
     # Create mock response
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -84,7 +80,7 @@ def test_extract_flows_cli(mock_requests_get, tmp_path, mock_amplitude_events):
     # Verify CLI execution
     assert result.exit_code == 0
     assert output_dir.exists()
-    
+
     # Check output files
     flow_files = list(output_dir.glob("*.json"))
     assert len(flow_files) == 1
@@ -101,7 +97,7 @@ def test_extract_flows_cli_standard_region(mock_requests_get, tmp_path, mock_amp
     with zipfile.ZipFile(zip_buffer, "w") as zip_file:
         event_data = "\n".join(json.dumps(event) for event in mock_amplitude_events)
         zip_file.writestr("events.json", event_data)
-    
+
     # Create mock response
     mock_response = MagicMock()
     mock_response.status_code = 200
@@ -189,13 +185,13 @@ def test_config_commands(tmp_path):
     """Test configuration management commands."""
     runner = CliRunner()
     config_file = tmp_path / "config.yaml"
-    
+
     # Test show command with non-existent config
     result = runner.invoke(amplitude, ["config", "show", "--config-path", str(config_file)])
     assert result.exit_code == 0
     assert "Created default configuration at" in result.output
     assert "Please edit the configuration file" in result.output
-    
+
     # Verify the config file was created with default values
     with open(config_file) as f:
         config_data = yaml.safe_load(f)
@@ -205,7 +201,7 @@ def test_config_commands(tmp_path):
         assert config_data["business_impact"]["login"] == 5
         assert config_data["business_impact"]["checkout"] == 4
         assert config_data["business_impact"]["profile"] == 3
-    
+
     # Test set-weight command
     result = runner.invoke(amplitude, [
         "config", "set-weight",
@@ -215,12 +211,12 @@ def test_config_commands(tmp_path):
     ])
     assert result.exit_code == 0
     assert "Updated error_weight to 3.0" in result.output
-    
+
     # Verify the weight was updated
     with open(config_file) as f:
         config_data = yaml.safe_load(f)
         assert config_data["weights"]["error_weight"] == 3.0
-    
+
     # Test set-impact command
     result = runner.invoke(amplitude, [
         "config", "set-impact",
@@ -230,7 +226,7 @@ def test_config_commands(tmp_path):
     ])
     assert result.exit_code == 0
     assert "Updated impact for profile to 3" in result.output
-    
+
     # Verify the impact was updated
     with open(config_file) as f:
         config_data = yaml.safe_load(f)
@@ -259,7 +255,7 @@ def test_score_flows_command(tmp_path):
     }
     with open(flow_file, 'w') as f:
         json.dump(flow_data, f)
-    
+
     # Test with non-existent config file
     config_file = tmp_path / "testgenesis.config"
     runner = CliRunner()
@@ -268,7 +264,7 @@ def test_score_flows_command(tmp_path):
         "--flows-dir", str(tmp_path),
         "--config-path", str(config_file)
     ])
-    
+
     assert result.exit_code == 0
     assert "Created default configuration at" in result.output
     assert "Please edit the configuration file" in result.output
@@ -278,7 +274,7 @@ def test_score_flows_command(tmp_path):
     assert "0" in result.output   # expected_error_count
     assert "1" in result.output   # unexpected_error_count
     assert "5.0" in result.output # business impact
-    
+
     # Verify config file was created with values based on flow data
     with open(config_file) as f:
         config = yaml.safe_load(f)
@@ -287,7 +283,7 @@ def test_score_flows_command(tmp_path):
         assert config["weights"]["business_weight"] == 1.5
         assert config["business_impact"]["default"] == 2
         assert config["business_impact"]["login"] == 5
-    
+
     # Test output to file
     output_file = tmp_path / "scores.json"
     result = runner.invoke(amplitude, [
@@ -296,7 +292,7 @@ def test_score_flows_command(tmp_path):
         "--config-path", str(config_file),
         "--output", str(output_file)
     ])
-    
+
     assert result.exit_code == 0
     assert "Saved scores to" in result.output
     with open(output_file) as f:

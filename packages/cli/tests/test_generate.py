@@ -1,10 +1,11 @@
 """Tests for test generation command."""
 
 import json
+from collections.abc import Generator
 from pathlib import Path
+
 import pytest
-from click.testing import CliRunner, Result
-from typing import Generator
+from click.testing import CliRunner
 
 from testgenesis_cli.commands.generate import generate
 

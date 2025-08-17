@@ -1,5 +1,5 @@
 """Test data generation strategies for core package."""
 
-from .flow import flow_data, config_data
+from .flow import config_data, flow_data
 
-__all__ = ['flow_data', 'config_data'] 
+__all__ = ['config_data', 'flow_data']

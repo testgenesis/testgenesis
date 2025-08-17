@@ -1,13 +1,13 @@
+import random
+
+from dotenv import load_dotenv
+from lib.amplitude import track_event
+from lib.auth import User
 from nicegui import ui
 from views.auth import create_login_page, create_register_page
-from views.store import create_store_page, create_cart_page
-from views.profile import create_profile_page
 from views.checkout import create_checkout_page
-from lib.auth import User
-from lib.amplitude import track_event
-import os
-from dotenv import load_dotenv
-import random
+from views.profile import create_profile_page
+from views.store import create_cart_page, create_store_page
 
 load_dotenv()
 
@@ -75,7 +75,7 @@ def create_error_control_panel():
     """Create a control panel for toggling errors."""
     with ui.card().classes('fixed top-4 right-4 z-10 bg-gray-800 p-4 rounded-lg shadow-lg'):
         ui.label('Error Control Panel').classes('text-h6 mb-4 text-white')
-        
+
         # Individual error toggles
         for flow in error_states:
             with ui.row().classes('items-center gap-2 mb-2'):
@@ -84,13 +84,13 @@ def create_error_control_panel():
                     value=error_states[flow],
                     on_change=lambda e, f=flow: toggle_error(f)
                 ).classes('text-white')
-        
+
         # Random error button
         ui.button(
             'Trigger Random Error',
             on_click=random_error
         ).classes('w-full mt-4 bg-red-500 hover:bg-red-600 text-white')
-        
+
         # Reset all button
         ui.button(
             'Reset All Errors',
@@ -104,21 +104,41 @@ def create_top_navigation():
             # Left side - Logo/Home
             with ui.row().classes('items-center gap-4'):
                 ui.link('🛍️ TestGenesis', '/store').classes('text-xl font-bold')
-            
+
             # Right side - Navigation items
             with ui.row().classes('items-center gap-4'):
-                with ui.button('Menu', icon='menu').props('flat').classes('text-white') as menu_button:
+                with ui.button(
+                    'Menu', icon='menu'
+                ).props('flat').classes('text-white') as menu_button:
                     with ui.menu().classes('bg-gray-800 text-white') as menu:
                         if current_user:
-                            ui.menu_item('Store', on_click=lambda: ui.navigate.to('/store')).classes('hover:bg-gray-700')
-                            ui.menu_item('Cart', on_click=lambda: ui.navigate.to('/cart')).classes('hover:bg-gray-700')
-                            ui.menu_item('Profile', on_click=lambda: ui.navigate.to('/profile')).classes('hover:bg-gray-700')
+                            ui.menu_item(
+                                'Store',
+                                on_click=lambda: ui.navigate.to('/store')
+                            ).classes('hover:bg-gray-700')
+                            ui.menu_item(
+                                'Cart',
+                                on_click=lambda: ui.navigate.to('/cart')
+                            ).classes('hover:bg-gray-700')
+                            ui.menu_item(
+                                'Profile',
+                                on_click=lambda: ui.navigate.to('/profile')
+                            ).classes('hover:bg-gray-700')
                             ui.separator().classes('my-2')
-                            ui.menu_item('Logout', on_click=lambda: set_current_user(None)).classes('text-red-400 hover:bg-gray-700')
+                            ui.menu_item(
+                                'Logout',
+                                on_click=lambda: set_current_user(None)
+                            ).classes('text-red-400 hover:bg-gray-700')
                         else:
-                            ui.menu_item('Login', on_click=lambda: ui.navigate.to('/login')).classes('hover:bg-gray-700')
-                            ui.menu_item('Register', on_click=lambda: ui.navigate.to('/register')).classes('hover:bg-gray-700')
-                    
+                            ui.menu_item(
+                                'Login',
+                                on_click=lambda: ui.navigate.to('/login')
+                            ).classes('hover:bg-gray-700')
+                            ui.menu_item(
+                                'Register',
+                                on_click=lambda: ui.navigate.to('/register')
+                            ).classes('hover:bg-gray-700')
+
                     menu_button.on('click', menu.toggle)
 
 @ui.page('/')
@@ -148,7 +168,7 @@ def login():
         return
 
     track_event('page_view', None, {'page': 'login'})
-    
+
     # Simulate database connection error
     if error_states["login"]:
         ui.notify(

@@ -1,12 +1,13 @@
 """Flow scoring functionality."""
 
-import yaml
-from pathlib import Path
-from typing import Dict, Union, Any, Optional
 import json
+from pathlib import Path
+from typing import Any
+
+import yaml
 
 
-def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
+def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
     """Generate a default configuration based on flow data.
     
     Args:
@@ -100,36 +101,36 @@ def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
                 }
             }
         }
-    
+
     # Scan flows to find unique pages and error patterns
     pages = set()
     error_count = 0
     total_flows = 0
     error_types = set()
-    
+
     for flow_file in Path(flows_dir).glob("*.json"):
         try:
             with open(flow_file) as f:
                 flow = json.load(f)
                 total_flows += 1
-                
+
                 # Extract pages and error types
                 for action in flow.get("actions", []):
                     if action["type"] == "[Amplitude] Page Viewed":
                         page = action["data"]["[Amplitude] Page URL"]
                         pages.add(page)
-                    
+
                     # Count errors and collect error types
                     if action["type"].lower().startswith("error"):
                         error_count += 1
                         error_types.add(action["type"])
         except Exception:
             continue
-    
+
     # Calculate weights based on data
     error_weight = 2.0
     business_weight = 1.5
-    
+
     if total_flows > 0:
         # Adjust error weight based on error frequency
         error_frequency = error_count / total_flows
@@ -137,10 +138,10 @@ def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
             error_weight = 1.5  # Reduce error weight if errors are common
         elif error_frequency < 0.1:
             error_weight = 2.5  # Increase error weight if errors are rare
-    
+
     # Generate business impact based on page names
     business_impact = {"default": 2}
-    
+
     # Common page patterns and their impact
     critical_pages = {
         "login": 5,
@@ -154,19 +155,19 @@ def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
         "api": 4,
         "auth": 5
     }
-    
+
     # Add impact for found pages
     for page in pages:
         page_name = page.split('/')[-1].lower()
         if page_name in critical_pages:
             business_impact[page_name] = critical_pages[page_name]
-    
+
     # Generate error categories based on found error types
     error_categories = {
         "expected_errors": {},
         "unexpected_errors": {}
     }
-    
+
     # Categorize found error types
     for error_type in error_types:
         error_type_lower = error_type.lower()
@@ -180,7 +181,7 @@ def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
                 "weight": 2.0,
                 "description": f"Unexpected error: {error_type}"
             }
-    
+
     return {
         "weights": {
             "error_weight": error_weight,
@@ -194,7 +195,7 @@ def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
 class FlowScorer:
     """Scorer for user flows based on frequency, errors, and business impact."""
 
-    def __init__(self, config_path_or_dict: Union[str, Dict[str, Any]], flows_dir: Optional[str] = None):
+    def __init__(self, config_path_or_dict: str | dict[str, Any], flows_dir: str | None = None):
         """Initialize the scorer with configuration.
         
         Args:
@@ -218,7 +219,7 @@ class FlowScorer:
                     config_data = yaml.safe_load(f)
         else:
             config_data = config_path_or_dict
-        
+
         self.config = config_data
         self.weights = config_data["weights"]
         self.business_impact = config_data["business_impact"]
@@ -235,7 +236,7 @@ class FlowScorer:
         page_name = page_url.split('/')[-1].lower()
         return self.business_impact.get(page_name, self.business_impact["default"])
 
-    def calculate_score(self, flow: Dict[str, Any]) -> Dict[str, Any]:
+    def calculate_score(self, flow: dict[str, Any]) -> dict[str, Any]:
         """Calculate score for a flow.
         
         Args:
@@ -246,18 +247,28 @@ class FlowScorer:
         """
         frequency = flow.get("frequency", 0)
         actions = flow.get("actions", [])
-        
+
         # Count errors by category
         expected_error_count = 0
         unexpected_error_count = 0
         error_details = []
-        
+
         for action in actions:
             if action["type"].lower().startswith("error"):
                 error_type = action["type"]
                 error_data = action.get("data", {})
                 error_categories = self.config.get("error_categories", {})
-                
+
+                # Extract error details
+                error_info = {
+                    "type": error_type,
+                    "message": error_data.get("message", "No message"),
+                    "error_code": error_data.get("error_code", "No code"),
+                    "error_type": error_data.get("error_type", "No type"),
+                    "page": error_data.get("[Amplitude] Page URL", "Unknown page"),
+                    "timestamp": error_data.get("timestamp", "Unknown time")
+                }
+
                 # Function to check if error matches conditions
                 def matches_conditions(conditions):
                     if not conditions:
@@ -266,28 +277,27 @@ class FlowScorer:
                         property_name = condition["property"]
                         expected_value = condition["value"]
                         actual_value = error_data.get(property_name)
-                        
+
                         # Handle numeric values
                         if isinstance(expected_value, (int, float)) and isinstance(actual_value, str):
                             try:
                                 actual_value = float(actual_value)
                             except ValueError:
                                 continue
-                        
+
                         if actual_value == expected_value:
                             return True
                     return False
-                
+
                 # Check expected errors first
                 for category, error_config in error_categories.get("expected_errors", {}).items():
                     if error_type == category and matches_conditions(error_config.get("conditions", [])):
                         expected_error_count += 1
                         error_details.append({
-                            "type": error_type,
+                            **error_info,
                             "category": "expected",
                             "weight": 0,  # Expected errors don't affect score
-                            "description": error_config["description"],
-                            "data": error_data
+                            "description": error_config["description"]
                         })
                         break
                 else:
@@ -296,24 +306,22 @@ class FlowScorer:
                         if error_type == category and matches_conditions(error_config.get("conditions", [])):
                             unexpected_error_count += 1
                             error_details.append({
-                                "type": error_type,
+                                **error_info,
                                 "category": "unexpected",
                                 "weight": error_config["weight"],
-                                "description": error_config["description"],
-                                "data": error_data
+                                "description": error_config["description"]
                             })
                             break
                     else:
                         # Default to unexpected if not categorized
                         unexpected_error_count += 1
                         error_details.append({
-                            "type": error_type,
+                            **error_info,
                             "category": "unexpected",
                             "weight": 2.0,
-                            "description": "Uncategorized error",
-                            "data": error_data
+                            "description": f"Uncategorized error: {error_type}"
                         })
-        
+
         # Get business impact from first page view
         business_impact = 0
         for action in actions:
@@ -321,7 +329,7 @@ class FlowScorer:
                 page_url = action["data"]["[Amplitude] Page URL"]
                 business_impact = self.get_business_impact(page_url)
                 break
-        
+
         # Calculate total score with only unexpected errors
         error_score = sum(error["weight"] for error in error_details if error["category"] == "unexpected")
         score = (
@@ -329,7 +337,7 @@ class FlowScorer:
             (error_score * self.weights["error_weight"]) +
             (business_impact * self.weights["business_weight"])
         )
-        
+
         return {
             "score": score,
             "frequency": frequency,
@@ -343,4 +351,4 @@ class FlowScorer:
 def save_config(config: dict, config_path: str) -> None:
     """Save configuration to YAML file."""
     with open(config_path, 'w') as f:
-        yaml.dump(config, f, default_flow_style=False) 
+        yaml.dump(config, f, default_flow_style=False)

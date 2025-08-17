@@ -1,17 +1,18 @@
 """Core flow scoring functionality."""
 
-import yaml
-from pathlib import Path
-from typing import Dict, Union, Any, Optional
 import json
+from pathlib import Path
+from typing import Any
+
+import yaml
 
 
-def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
+def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
     """Generate a default configuration based on flow data.
     
     Args:
         flows_dir: Optional directory containing flow files to analyze.
-                  If provided, will scan flows to determine pages and weights.
+                  If provided, will scan flows to determine error weight.
     
     Returns:
         Dict containing the default configuration.
@@ -19,44 +20,30 @@ def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
     if not flows_dir:
         return {
             "weights": {
-                "error_weight": 2.0,
-                "business_weight": 1.5
-            },
-            "business_criticality": {
-                "default": 2,
-                "login": 5,
-                "checkout": 4,
-                "profile": 3
+                "error_weight": 2.0
             }
         }
-    
-    # Scan flows to find unique pages and error patterns
-    pages = set()
+
+    # Scan flows to find error patterns
     error_count = 0
     total_flows = 0
-    
+
     for flow_file in Path(flows_dir).glob("*.json"):
         try:
             with open(flow_file) as f:
                 flow = json.load(f)
                 total_flows += 1
-                
-                # Extract pages
+
+                # Count errors
                 for action in flow.get("actions", []):
-                    if action["type"] == "[Amplitude] Page Viewed":
-                        page = action["data"]["[Amplitude] Page URL"]
-                        pages.add(page)
-                    
-                    # Count errors
                     if action["type"].lower().startswith("error"):
                         error_count += 1
         except Exception:
             continue
-    
+
     # Calculate weights based on data
     error_weight = 2.0
-    business_weight = 1.5
-    
+
     if total_flows > 0:
         # Adjust error weight based on error frequency
         error_frequency = error_count / total_flows
@@ -64,43 +51,18 @@ def get_default_config(flows_dir: Optional[str] = None) -> Dict[str, Any]:
             error_weight = 1.5  # Reduce error weight if errors are common
         elif error_frequency < 0.1:
             error_weight = 2.5  # Increase error weight if errors are rare
-    
-    # Generate business criticality based on page names
-    business_criticality = {"default": 2}
-    
-    # Common page patterns and their criticality
-    critical_pages = {
-        "login": 5,
-        "checkout": 4,
-        "profile": 3,
-        "payment": 4,
-        "signup": 4,
-        "settings": 3,
-        "dashboard": 3,
-        "admin": 5,
-        "api": 4,
-        "auth": 5
-    }
-    
-    # Add criticality for found pages
-    for page in pages:
-        page_name = page.split('/')[-1].lower()
-        if page_name in critical_pages:
-            business_criticality[page_name] = critical_pages[page_name]
-    
+
     return {
         "weights": {
-            "error_weight": error_weight,
-            "business_weight": business_weight
-        },
-        "business_criticality": business_criticality
+            "error_weight": error_weight
+        }
     }
 
 
 class FlowScorer:
-    """Scorer for user flows based on frequency, errors, and business criticality."""
+    """Scorer for user flows based on frequency and errors."""
 
-    def __init__(self, config_path_or_dict: Union[str, Dict[str, Any]], flows_dir: Optional[str] = None):
+    def __init__(self, config_path_or_dict: str | dict[str, Any], flows_dir: str | None = None):
         """Initialize the scorer with configuration.
         
         Args:
@@ -122,24 +84,11 @@ class FlowScorer:
                     config_data = yaml.safe_load(f)
         else:
             config_data = config_path_or_dict
-        
+
         self.config = config_data
         self.weights = config_data["weights"]
-        self.business_criticality = config_data["business_criticality"]
 
-    def get_business_criticality(self, page_url: str) -> float:
-        """Get business criticality score for a page.
-        
-        Args:
-            page_url: URL of the page
-            
-        Returns:
-            Business criticality score for the page
-        """
-        page_name = page_url.split('/')[-1].lower()
-        return self.business_criticality.get(page_name, self.business_criticality["default"])
-
-    def calculate_score(self, flow: Dict[str, Any]) -> Dict[str, Any]:
+    def calculate_score(self, flow: dict[str, Any]) -> dict[str, Any]:
         """Calculate score for a flow.
         
         Args:
@@ -150,35 +99,22 @@ class FlowScorer:
         """
         frequency = flow.get("frequency", 0)
         actions = flow.get("actions", [])
-        
+
         # Count errors
-        error_count = sum(1 for action in actions 
+        error_count = sum(1 for action in actions
                          if action["type"].lower().startswith("error"))
-        
-        # Get business criticality from first page view
-        business_criticality = 0
-        for action in actions:
-            if action["type"] == "[Amplitude] Page Viewed":
-                page_url = action["data"]["[Amplitude] Page URL"]
-                business_criticality = self.get_business_criticality(page_url)
-                break
-        
+
         # Calculate total score
-        score = (
-            frequency +
-            (error_count * self.weights["error_weight"]) +
-            (business_criticality * self.weights["business_weight"])
-        )
-        
+        score = frequency + (error_count * self.weights["error_weight"])
+
         return {
             "score": score,
             "frequency": frequency,
-            "error_count": error_count,
-            "business_criticality": business_criticality
+            "error_count": error_count
         }
 
 
 def save_config(config: dict, config_path: str) -> None:
     """Save configuration to YAML file."""
     with open(config_path, 'w') as f:
-        yaml.dump(config, f, default_flow_style=False) 
+        yaml.dump(config, f, default_flow_style=False)

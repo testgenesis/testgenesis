@@ -2,4 +2,4 @@
 
 from .generate import generate
 
-__all__ = ["generate"] 
+__all__ = ["generate"]
