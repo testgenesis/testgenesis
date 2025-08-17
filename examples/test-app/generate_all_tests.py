@@ -12,11 +12,11 @@ def generate_tests():
     tests_dir = Path("./tests/generated")
     tests_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Generating Playwright Tests from Flows")
     print(f"Source: {flows_dir}")
     print(f"Output: {tests_dir}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     generated_tests = []
 
@@ -31,12 +31,22 @@ def generate_tests():
 
         try:
             # Use uv run to execute testgenesis
-            result = subprocess.run([
-                "uv", "run", "testgenesis", "generate",
-                f"examples/test-app/{flow_file}",
-                "--framework", "playwright",
-                "--output", f"examples/test-app/{test_file}"
-            ], capture_output=True, text=True, check=True)
+            result = subprocess.run(
+                [
+                    "uv",
+                    "run",
+                    "testgenesis",
+                    "generate",
+                    f"examples/test-app/{flow_file}",
+                    "--framework",
+                    "playwright",
+                    "--output",
+                    f"examples/test-app/{test_file}",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
 
             print(f"  ✓ Generated: {test_file.name}")
             generated_tests.append(test_file.name)
@@ -45,16 +55,17 @@ def generate_tests():
             print(f"  ✗ Failed: {e}")
             print(f"    Error: {e.stderr}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Test Generation Complete!")
     print(f"Generated {len(generated_tests)} test files:")
     for test in generated_tests:
         print(f"  - {test}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     print("To run the tests:")
     print("  cd examples/test-app")
     print("  npx playwright test tests/generated/")
+
 
 if __name__ == "__main__":
     generate_tests()

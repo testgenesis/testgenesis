@@ -9,20 +9,16 @@ import yaml
 
 def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
     """Generate a default configuration based on flow data.
-    
+
     Args:
         flows_dir: Optional directory containing flow files to analyze.
                   If provided, will scan flows to determine error weight.
-    
+
     Returns:
         Dict containing the default configuration.
     """
     if not flows_dir:
-        return {
-            "weights": {
-                "error_weight": 2.0
-            }
-        }
+        return {"weights": {"error_weight": 2.0}}
 
     # Scan flows to find error patterns
     error_count = 0
@@ -52,11 +48,7 @@ def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
         elif error_frequency < 0.1:
             error_weight = 2.5  # Increase error weight if errors are rare
 
-    return {
-        "weights": {
-            "error_weight": error_weight
-        }
-    }
+    return {"weights": {"error_weight": error_weight}}
 
 
 class FlowScorer:
@@ -64,7 +56,7 @@ class FlowScorer:
 
     def __init__(self, config_path_or_dict: str | dict[str, Any], flows_dir: str | None = None):
         """Initialize the scorer with configuration.
-        
+
         Args:
             config_path_or_dict: Path to YAML config file or dict with config data.
             flows_dir: Optional directory containing flow files to analyze.
@@ -77,7 +69,7 @@ class FlowScorer:
                 config_data = get_default_config(flows_dir)
                 # Ensure parent directory exists
                 config_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(config_path, 'w') as f:
+                with open(config_path, "w") as f:
                     yaml.dump(config_data, f, default_flow_style=False)
             else:
                 with open(config_path) as f:
@@ -90,10 +82,10 @@ class FlowScorer:
 
     def calculate_score(self, flow: dict[str, Any]) -> dict[str, Any]:
         """Calculate score for a flow.
-        
+
         Args:
             flow: Dictionary containing flow data with frequency and actions
-            
+
         Returns:
             Dictionary containing score and component values
         """
@@ -101,21 +93,15 @@ class FlowScorer:
         actions = flow.get("actions", [])
 
         # Count errors
-        error_count = sum(1 for action in actions
-                         if action["type"].lower().startswith("error"))
+        error_count = sum(1 for action in actions if action["type"].lower().startswith("error"))
 
         # Calculate total score
         score = frequency + (error_count * self.weights["error_weight"])
 
-        return {
-            "score": score,
-            "frequency": frequency,
-            "error_count": error_count
-        }
+        return {"score": score, "frequency": frequency, "error_count": error_count}
 
 
 def save_config(config: dict, config_path: str) -> None:
     """Save configuration to YAML file."""
-    with open(config_path, 'w') as f:
+    with open(config_path, "w") as f:
         yaml.dump(config, f, default_flow_style=False)
-

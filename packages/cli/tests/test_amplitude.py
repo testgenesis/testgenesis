@@ -20,7 +20,7 @@ def mock_amplitude_events():
         "session_id": "session1",
         "event_type": "navigation",
         "event_properties": {"path": "/login"},
-        "client_event_time": "2024-03-01T12:00:00.000Z"
+        "client_event_time": "2024-03-01T12:00:00.000Z",
     }
 
     event2 = {
@@ -29,9 +29,9 @@ def mock_amplitude_events():
         "event_type": "form",
         "event_properties": {
             "target": "#login-form",
-            "data": {"username": "testuser", "password": "password123"}
+            "data": {"username": "testuser", "password": "password123"},
         },
-        "client_event_time": "2024-03-01T12:01:00.000Z"
+        "client_event_time": "2024-03-01T12:01:00.000Z",
     }
 
     return [event1, event2]
@@ -160,15 +160,8 @@ def test_extract_flows_cli_invalid_dates():
 def mock_config():
     """Create a mock configuration file."""
     return {
-        "weights": {
-            "error_weight": 2.0,
-            "business_weight": 1.5
-        },
-        "business_impact": {
-            "default": 2,
-            "login": 5,
-            "checkout": 4
-        }
+        "weights": {"error_weight": 2.0, "business_weight": 1.5},
+        "business_impact": {"default": 2, "login": 5, "checkout": 4},
     }
 
 
@@ -176,7 +169,7 @@ def mock_config():
 def config_file(tmp_path, mock_config):
     """Create a temporary config file."""
     config_path = tmp_path / "config.yaml"
-    with open(config_path, 'w') as f:
+    with open(config_path, "w") as f:
         yaml.dump(mock_config, f)
     return config_path
 
@@ -203,12 +196,19 @@ def test_config_commands(tmp_path):
         assert config_data["business_impact"]["profile"] == 3
 
     # Test set-weight command
-    result = runner.invoke(amplitude, [
-        "config", "set-weight",
-        "--weight-name", "error_weight",
-        "--value", "3.0",
-        "--config-path", str(config_file)
-    ])
+    result = runner.invoke(
+        amplitude,
+        [
+            "config",
+            "set-weight",
+            "--weight-name",
+            "error_weight",
+            "--value",
+            "3.0",
+            "--config-path",
+            str(config_file),
+        ],
+    )
     assert result.exit_code == 0
     assert "Updated error_weight to 3.0" in result.output
 
@@ -218,12 +218,19 @@ def test_config_commands(tmp_path):
         assert config_data["weights"]["error_weight"] == 3.0
 
     # Test set-impact command
-    result = runner.invoke(amplitude, [
-        "config", "set-impact",
-        "--page", "profile",
-        "--value", "3",
-        "--config-path", str(config_file)
-    ])
+    result = runner.invoke(
+        amplitude,
+        [
+            "config",
+            "set-impact",
+            "--page",
+            "profile",
+            "--value",
+            "3",
+            "--config-path",
+            str(config_file),
+        ],
+    )
     assert result.exit_code == 0
     assert "Updated impact for profile to 3" in result.output
 
@@ -240,30 +247,25 @@ def test_score_flows_command(tmp_path):
     flow_data = {
         "frequency": 10,
         "actions": [
-            {
-                "type": "[Amplitude] Page Viewed",
-                "data": {"[Amplitude] Page URL": "/login"}
-            },
+            {"type": "[Amplitude] Page Viewed", "data": {"[Amplitude] Page URL": "/login"}},
             {
                 "type": "error",
                 "data": {
                     "error_code": "auth_service_error",
-                    "message": "Authentication service unavailable"
-                }
-            }
-        ]
+                    "message": "Authentication service unavailable",
+                },
+            },
+        ],
     }
-    with open(flow_file, 'w') as f:
+    with open(flow_file, "w") as f:
         json.dump(flow_data, f)
 
     # Test with non-existent config file
     config_file = tmp_path / "testgenesis.config"
     runner = CliRunner()
-    result = runner.invoke(amplitude, [
-        "score-flows",
-        "--flows-dir", str(tmp_path),
-        "--config-path", str(config_file)
-    ])
+    result = runner.invoke(
+        amplitude, ["score-flows", "--flows-dir", str(tmp_path), "--config-path", str(config_file)]
+    )
 
     assert result.exit_code == 0
     assert "Created default configuration at" in result.output
@@ -271,9 +273,9 @@ def test_score_flows_command(tmp_path):
     assert "Flow Scores" in result.output
     assert "user_flow_123.json" in result.output
     assert "10" in result.output  # frequency
-    assert "0" in result.output   # expected_error_count
-    assert "1" in result.output   # unexpected_error_count
-    assert "5.0" in result.output # business impact
+    assert "0" in result.output  # expected_error_count
+    assert "1" in result.output  # unexpected_error_count
+    assert "5.0" in result.output  # business impact
 
     # Verify config file was created with values based on flow data
     with open(config_file) as f:
@@ -286,12 +288,18 @@ def test_score_flows_command(tmp_path):
 
     # Test output to file
     output_file = tmp_path / "scores.json"
-    result = runner.invoke(amplitude, [
-        "score-flows",
-        "--flows-dir", str(tmp_path),
-        "--config-path", str(config_file),
-        "--output", str(output_file)
-    ])
+    result = runner.invoke(
+        amplitude,
+        [
+            "score-flows",
+            "--flows-dir",
+            str(tmp_path),
+            "--config-path",
+            str(config_file),
+            "--output",
+            str(output_file),
+        ],
+    )
 
     assert result.exit_code == 0
     assert "Saved scores to" in result.output

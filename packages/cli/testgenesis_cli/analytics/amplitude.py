@@ -13,14 +13,13 @@ import requests
 import yaml
 from rich.console import Console
 from rich.table import Table
-
-from testgenesis_dsl import Action, TestFlow
 from testgenesis_core.analytics.amplitude import create_test_flow
+
+from testgenesis_dsl import TestFlow
 
 from .scorer import FlowScorer, get_default_config
 
 console = Console()
-
 
 
 def extract_user_flows(
@@ -30,7 +29,7 @@ def extract_user_flows(
     end_date: datetime,
     min_frequency: int = 5,
     output_dir: Path | None = None,
-    region: str = "eu"
+    region: str = "eu",
 ) -> list[TestFlow]:
     """Extract common user flows from Amplitude analytics using the Export API."""
     # Format dates for Amplitude Export API (YYYYMMDDTHH format)
@@ -45,12 +44,14 @@ def extract_user_flows(
         endpoint = "https://amplitude.com/api/2/export"
 
     # Make the API request
-    console.print(f"Fetching events from Amplitude ({region} region) for {start_date.date()} to {end_date.date()}...")
+    console.print(
+        f"Fetching events from Amplitude ({region} region) for {start_date.date()} to {end_date.date()}..."
+    )
     response = requests.get(
         endpoint,
         params={"start": start_str, "end": end_str},
         auth=(api_key, secret_key),
-        stream=True
+        stream=True,
     )
 
     # Check for errors
@@ -58,16 +59,24 @@ def extract_user_flows(
         console.print("[yellow]No data available for the time range requested.[/yellow]")
         return []
     elif response.status_code == 400:
-        console.print("[red]The file size of the exported data is too large. Try shortening the time range.[/red]")
+        console.print(
+            "[red]The file size of the exported data is too large. Try shortening the time range.[/red]"
+        )
         response.raise_for_status()
     elif response.status_code == 403:
-        console.print("[red]Authorization failed. Check your API key, secret key, and ensure you're using the correct region (EU or standard).[/red]")
+        console.print(
+            "[red]Authorization failed. Check your API key, secret key, and ensure you're using the correct region (EU or standard).[/red]"
+        )
         response.raise_for_status()
     elif response.status_code == 504:
-        console.print("[red]The amount of data is large causing a timeout. Use a shorter time range.[/red]")
+        console.print(
+            "[red]The amount of data is large causing a timeout. Use a shorter time range.[/red]"
+        )
         response.raise_for_status()
     elif response.status_code != 200:
-        console.print(f"[red]Error from Amplitude API: {response.status_code} - {response.text}[/red]")
+        console.print(
+            f"[red]Error from Amplitude API: {response.status_code} - {response.text}[/red]"
+        )
         response.raise_for_status()
 
     # Process the ZIP file response
@@ -80,7 +89,7 @@ def extract_user_flows(
 
         for file_name in file_list:
             # Check if the file is a gzip file by name
-            is_gzip_by_name = file_name.endswith('.gz')
+            is_gzip_by_name = file_name.endswith(".gz")
             console.print(f"Processing file: {file_name} (gzipped: {is_gzip_by_name})")
 
             with zip_file.open(file_name) as file:
@@ -91,7 +100,9 @@ def extract_user_flows(
                         file_content = file.read()
 
                         # Process based on whether it's a gzip file by name or content
-                        if is_gzip_by_name or file_content.startswith(b'\x1f\x8b'):  # gzip magic number
+                        if is_gzip_by_name or file_content.startswith(
+                            b"\x1f\x8b"
+                        ):  # gzip magic number
                             # Decompress gzip content
                             with io.BytesIO(file_content) as compressed_stream:
                                 with gzip.GzipFile(fileobj=compressed_stream) as gzip_stream:
@@ -100,18 +111,25 @@ def extract_user_flows(
                         else:
                             lines = file_content.splitlines()
                     except Exception as e:
-                        console.print(f"[yellow]Warning: Error decompressing file {file_name}: {e}[/yellow]")
+                        console.print(
+                            f"[yellow]Warning: Error decompressing file {file_name}: {e}[/yellow]"
+                        )
                         # Fall back to reading file directly
                         file.seek(0)
                         lines = file.readlines()
 
-                    for line in lines:
-                        if isinstance(line, bytes):
+                    for line_raw in lines:
+                        # Convert bytes to string if needed
+                        if isinstance(line_raw, bytes):
                             try:
-                                line = line.decode('utf-8')
+                                line = line_raw.decode("utf-8")
                             except UnicodeDecodeError:
-                                console.print("[yellow]Warning: Cannot decode line as UTF-8, skipping.[/yellow]")
+                                console.print(
+                                    "[yellow]Warning: Cannot decode line as UTF-8, skipping.[/yellow]"
+                                )
                                 continue
+                        else:
+                            line = line_raw
                         if line.strip():  # Skip empty lines
                             try:
                                 event = json.loads(line)
@@ -120,7 +138,9 @@ def extract_user_flows(
                                 console.print(f"[yellow]Warning: Invalid JSON format: {e}[/yellow]")
                                 continue
                 except Exception as e:
-                    console.print(f"[yellow]Warning: Error processing file {file_name}: {e}[/yellow]")
+                    console.print(
+                        f"[yellow]Warning: Error processing file {file_name}: {e}[/yellow]"
+                    )
                     continue
 
     console.print(f"Found {len(events)} events.")
@@ -179,7 +199,9 @@ def amplitude() -> None:
 @amplitude.command()
 @click.option("--api-key", required=True, help="Amplitude API key")
 @click.option("--secret-key", required=True, help="Amplitude secret key")
-@click.option("--start-date", type=click.DateTime(), help="Start date (YYYY-MM-DD), defaults to yesterday")
+@click.option(
+    "--start-date", type=click.DateTime(), help="Start date (YYYY-MM-DD), defaults to yesterday"
+)
 @click.option("--end-date", type=click.DateTime(), help="End date (YYYY-MM-DD), defaults to today")
 @click.option("--min-frequency", default=5, help="Minimum frequency to consider a flow")
 @click.option("--output-dir", type=click.Path(), help="Directory to save extracted flows")
@@ -197,15 +219,21 @@ def extract_flows(
     # Use yesterday if start_date is not provided
     if start_date is None:
         start_date = get_yesterday()
-        console.print(f"[yellow]No start date provided. Using yesterday: {start_date.strftime('%Y-%m-%d')}[/yellow]")
+        console.print(
+            f"[yellow]No start date provided. Using yesterday: {start_date.strftime('%Y-%m-%d')}[/yellow]"
+        )
 
     # Use today if end_date is not provided
     if end_date is None:
         end_date = get_today()
-        console.print(f"[yellow]No end date provided. Using today: {end_date.strftime('%Y-%m-%d')}[/yellow]")
+        console.print(
+            f"[yellow]No end date provided. Using today: {end_date.strftime('%Y-%m-%d')}[/yellow]"
+        )
 
     output_path = Path(output_dir) if output_dir else None
-    flows = extract_user_flows(api_key, secret_key, start_date, end_date, min_frequency, output_path, region)
+    flows = extract_user_flows(
+        api_key, secret_key, start_date, end_date, min_frequency, output_path, region
+    )
 
     # Display results
     table = Table(title="Extracted Test Flows")
@@ -224,9 +252,10 @@ def extract_flows(
 
 
 @amplitude.group()
-def config():
+def config() -> None:
     """Manage configuration for flow scoring."""
     pass
+
 
 @config.command()
 @click.option(
@@ -235,21 +264,23 @@ def config():
     default="testgenesis.config",
     help="Path to configuration file (default: testgenesis.config)",
 )
-def show(config_path: str):
+def show(config_path: str) -> None:
     """Show current configuration."""
     try:
         # Create default config if file doesn't exist
-        config_path = Path(config_path)
-        if not config_path.exists():
+        config_file_path = Path(config_path)
+        if not config_file_path.exists():
             config_data = get_default_config()
             # Ensure parent directory exists
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(config_path, 'w') as f:
+            config_file_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_file_path, "w") as f:
                 yaml.dump(config_data, f, default_flow_style=False)
-            click.echo(f"Created default configuration at {config_path}")
-            click.echo("Please edit the configuration file to customize weights and criticality values.")
+            click.echo(f"Created default configuration at {config_file_path}")
+            click.echo(
+                "Please edit the configuration file to customize weights and criticality values."
+            )
         else:
-            with open(config_path) as f:
+            with open(config_file_path) as f:
                 config_data = yaml.safe_load(f)
 
         # Print config as formatted YAML
@@ -257,6 +288,7 @@ def show(config_path: str):
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise click.Abort()
+
 
 @config.command()
 @click.option(
@@ -277,31 +309,32 @@ def show(config_path: str):
     required=True,
     help="New value for the weight",
 )
-def set_weight(config_path: str, weight_name: str, value: float):
+def set_weight(config_path: str, weight_name: str, value: float) -> None:
     """Update a weight in the configuration."""
     try:
         # Load existing config or create default
-        config_path = Path(config_path)
-        if not config_path.exists():
+        config_file_path = Path(config_path)
+        if not config_file_path.exists():
             config_data = get_default_config()
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(config_path, 'w') as f:
+            config_file_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_file_path, "w") as f:
                 yaml.dump(config_data, f, default_flow_style=False)
         else:
-            with open(config_path) as f:
+            with open(config_file_path) as f:
                 config_data = yaml.safe_load(f)
 
         # Update the weight
         config_data["weights"][weight_name] = value
 
         # Save updated config
-        with open(config_path, 'w') as f:
+        with open(config_file_path, "w") as f:
             yaml.dump(config_data, f, default_flow_style=False)
 
         click.echo(f"Updated {weight_name} to {value}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise click.Abort()
+
 
 @config.command()
 @click.option(
@@ -321,32 +354,33 @@ def set_weight(config_path: str, weight_name: str, value: float):
     required=True,
     help="New impact value for the page",
 )
-def set_impact(config_path: str, page: str, value: float):
+def set_impact(config_path: str, page: str, value: float) -> None:
     """Update business impact for a specific page."""
     try:
         # Load existing config or create default
-        config_path = Path(config_path)
-        if not config_path.exists():
+        config_file_path = Path(config_path)
+        if not config_file_path.exists():
             config_data = get_default_config()
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(config_path, 'w') as f:
+            config_file_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(config_file_path, "w") as f:
                 yaml.dump(config_data, f, default_flow_style=False)
         else:
-            with open(config_path) as f:
+            with open(config_file_path) as f:
                 config_data = yaml.safe_load(f)
 
         # Update the impact
-        page_name = page.split('/')[-1].lower()
+        page_name = page.split("/")[-1].lower()
         config_data["business_impact"][page_name] = value
 
         # Save updated config
-        with open(config_path, 'w') as f:
+        with open(config_file_path, "w") as f:
             yaml.dump(config_data, f, default_flow_style=False)
 
         click.echo(f"Updated impact for {page_name} to {value}")
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise click.Abort()
+
 
 @amplitude.command()
 @click.option(
@@ -366,7 +400,7 @@ def set_impact(config_path: str, page: str, value: float):
     type=click.Path(dir_okay=False),
     help="Path to save scores as JSON",
 )
-def score_flows(flows_dir: str, config_path: str, output: str | None = None):
+def score_flows(flows_dir: str, config_path: str, output: str | None = None) -> None:
     """Score user flows based on frequency, errors, and business impact."""
     try:
         # Debug: Print config file path
@@ -416,7 +450,7 @@ def score_flows(flows_dir: str, config_path: str, output: str | None = None):
 
         if output:
             # Save results to file
-            with open(output, 'w') as f:
+            with open(output, "w") as f:
                 json.dump(results, f, indent=2)
             click.echo(f"Saved scores to {output}")
         else:
@@ -434,7 +468,7 @@ def score_flows(flows_dir: str, config_path: str, output: str | None = None):
                     f"{result['score']:.1f}",
                     str(result["frequency"]),
                     str(result["unexpected_error_count"]),
-                    f"{result['business_impact']:.1f}"
+                    f"{result['business_impact']:.1f}",
                 )
 
             console = Console()
@@ -460,4 +494,3 @@ def score_flows(flows_dir: str, config_path: str, output: str | None = None):
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         raise click.Abort()
-

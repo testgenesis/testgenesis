@@ -43,7 +43,12 @@ class AmplitudeEventGenerator:
         """Wait for Amplitude events to be sent."""
         await self.page.wait_for_timeout(milliseconds)
 
-    async def login_flow(self, email: str = "test@example.com", password: str = "password123", should_fail: bool = False):
+    async def login_flow(
+        self,
+        email: str = "test@example.com",
+        password: str = "password123",
+        should_fail: bool = False,
+    ):
         """Execute a login flow."""
         print(f"[{datetime.now()}] Starting login flow (should_fail={should_fail})...")
 
@@ -52,7 +57,9 @@ class AmplitudeEventGenerator:
         await self.wait_for_amplitude()
 
         # Fill in login form
-        await self.page.fill('input[type="email"]', email if not should_fail else "wrong@example.com")
+        await self.page.fill(
+            'input[type="email"]', email if not should_fail else "wrong@example.com"
+        )
         await self.page.fill('input[type="password"]', password if not should_fail else "wrongpass")
         await self.wait_for_amplitude()
 
@@ -60,11 +67,9 @@ class AmplitudeEventGenerator:
         await self.page.click('button:has-text("Login")')
         await self.wait_for_amplitude(2000)
 
-        self.events_generated.append({
-            "flow": "login",
-            "success": not should_fail,
-            "timestamp": datetime.now().isoformat()
-        })
+        self.events_generated.append(
+            {"flow": "login", "success": not should_fail, "timestamp": datetime.now().isoformat()}
+        )
 
         print(f"  ✓ Login flow completed (success={not should_fail})")
 
@@ -77,7 +82,7 @@ class AmplitudeEventGenerator:
         await self.wait_for_amplitude()
 
         # View products
-        products = await self.page.query_selector_all('.product-card')
+        products = await self.page.query_selector_all(".product-card")
         if products:
             # Click on first product
             await products[0].click()
@@ -99,10 +104,10 @@ class AmplitudeEventGenerator:
 
         # Fill checkout form if present
         if await self.page.query_selector('input[name="cardNumber"]'):
-            await self.page.fill('input[name="cardNumber"]', '4242424242424242')
-            await self.page.fill('input[name="cardName"]', 'Test User')
-            await self.page.fill('input[name="expiryDate"]', '12/25')
-            await self.page.fill('input[name="cvv"]', '123')
+            await self.page.fill('input[name="cardNumber"]', "4242424242424242")
+            await self.page.fill('input[name="cardName"]', "Test User")
+            await self.page.fill('input[name="expiryDate"]', "12/25")
+            await self.page.fill('input[name="cvv"]', "123")
             await self.wait_for_amplitude()
 
             # Complete purchase
@@ -111,10 +116,7 @@ class AmplitudeEventGenerator:
                 await complete_btn.click()
                 await self.wait_for_amplitude(2000)
 
-        self.events_generated.append({
-            "flow": "shopping",
-            "timestamp": datetime.now().isoformat()
-        })
+        self.events_generated.append({"flow": "shopping", "timestamp": datetime.now().isoformat()})
 
         print("  ✓ Shopping flow completed")
 
@@ -128,8 +130,8 @@ class AmplitudeEventGenerator:
 
         # Update profile if form exists
         if await self.page.query_selector('input[name="name"]'):
-            await self.page.fill('input[name="name"]', 'Updated Name')
-            await self.page.fill('input[name="email"]', 'updated@example.com')
+            await self.page.fill('input[name="name"]', "Updated Name")
+            await self.page.fill('input[name="email"]', "updated@example.com")
             await self.wait_for_amplitude()
 
             save_btn = await self.page.query_selector('button:has-text("Save")')
@@ -137,10 +139,7 @@ class AmplitudeEventGenerator:
                 await save_btn.click()
                 await self.wait_for_amplitude()
 
-        self.events_generated.append({
-            "flow": "profile",
-            "timestamp": datetime.now().isoformat()
-        })
+        self.events_generated.append({"flow": "profile", "timestamp": datetime.now().isoformat()})
 
         print("  ✓ Profile flow completed")
 
@@ -161,27 +160,26 @@ class AmplitudeEventGenerator:
         # Toggle error state back off
         await self.page.goto(f"{self.base_url}/api/toggle-error/{flow_type}")
 
-        self.events_generated.append({
-            "flow": f"error_{flow_type}",
-            "timestamp": datetime.now().isoformat()
-        })
+        self.events_generated.append(
+            {"flow": f"error_{flow_type}", "timestamp": datetime.now().isoformat()}
+        )
 
         print(f"  ✓ Error flow completed for {flow_type}")
 
     async def run_complete_journey(self, iterations: int = 1, include_errors: bool = True):
         """Run a complete user journey multiple times."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Starting E2E Amplitude Event Generation")
         print(f"Base URL: {self.base_url}")
         print(f"Iterations: {iterations}")
         print(f"Include Errors: {include_errors}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         await self.setup()
 
         try:
             for i in range(iterations):
-                print(f"\n--- Iteration {i+1}/{iterations} ---")
+                print(f"\n--- Iteration {i + 1}/{iterations} ---")
 
                 # Standard flows
                 await self.login_flow()
@@ -203,10 +201,10 @@ class AmplitudeEventGenerator:
         finally:
             await self.teardown()
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("E2E Event Generation Complete!")
         print(f"Total flows executed: {len(self.events_generated)}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         return self.events_generated
 
@@ -214,11 +212,15 @@ class AmplitudeEventGenerator:
         """Save a log of generated events for reference."""
         log_path = Path("generated_events.json")
         with open(log_path, "w") as f:
-            json.dump({
-                "generation_time": datetime.now().isoformat(),
-                "base_url": self.base_url,
-                "events": self.events_generated
-            }, f, indent=2)
+            json.dump(
+                {
+                    "generation_time": datetime.now().isoformat(),
+                    "base_url": self.base_url,
+                    "events": self.events_generated,
+                },
+                f,
+                indent=2,
+            )
         print(f"\nEvents log saved to: {log_path}")
 
 
@@ -228,36 +230,42 @@ class AmplitudeDataExtractor:
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    async def extract_flows(self, start_date: str = None, end_date: str = None, output_dir: str = "./test_flows"):
+    async def extract_flows(
+        self, start_date: str = None, end_date: str = None, output_dir: str = "./test_flows"
+    ):
         """Extract flows from Amplitude using TestGenesis CLI."""
         if not start_date:
             start_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         if not end_date:
             end_date = datetime.now().strftime("%Y-%m-%d")
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print("Extracting Amplitude Flows")
         print(f"Date Range: {start_date} to {end_date}")
         print(f"Output Directory: {output_dir}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Create output directory
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         # Build command
         cmd = [
-            "testgenesis", "amplitude", "extract-flows",
-            "--api-key", self.api_key,
-            "--start-date", start_date,
-            "--end-date", end_date,
-            "--output-dir", output_dir
+            "testgenesis",
+            "amplitude",
+            "extract-flows",
+            "--api-key",
+            self.api_key,
+            "--start-date",
+            start_date,
+            "--end-date",
+            end_date,
+            "--output-dir",
+            output_dir,
         ]
 
         # Execute extraction
         proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
 
         stdout, stderr = await proc.communicate()
@@ -282,22 +290,29 @@ class AmplitudeDataExtractor:
 
 async def main():
     """Main entry point for the E2E testing framework."""
-    parser = argparse.ArgumentParser(description="Generate and extract Amplitude events for E2E testing")
-    parser.add_argument("--base-url", default="http://localhost:8050", help="Base URL of the test app")
+    parser = argparse.ArgumentParser(
+        description="Generate and extract Amplitude events for E2E testing"
+    )
+    parser.add_argument(
+        "--base-url", default="http://localhost:8050", help="Base URL of the test app"
+    )
     parser.add_argument("--iterations", type=int, default=3, help="Number of test iterations")
     parser.add_argument("--headless", action="store_true", help="Run browser in headless mode")
-    parser.add_argument("--include-errors", action="store_true", default=True, help="Include error flows")
+    parser.add_argument(
+        "--include-errors", action="store_true", default=True, help="Include error flows"
+    )
     parser.add_argument("--extract", action="store_true", help="Extract flows after generation")
     parser.add_argument("--api-key", help="Amplitude API key for extraction")
-    parser.add_argument("--output-dir", default="./test_flows", help="Output directory for extracted flows")
+    parser.add_argument(
+        "--output-dir", default="./test_flows", help="Output directory for extracted flows"
+    )
 
     args = parser.parse_args()
 
     # Generate events
     generator = AmplitudeEventGenerator(base_url=args.base_url, headless=args.headless)
     events = await generator.run_complete_journey(
-        iterations=args.iterations,
-        include_errors=args.include_errors
+        iterations=args.iterations, include_errors=args.include_errors
     )
 
     # Extract flows if requested

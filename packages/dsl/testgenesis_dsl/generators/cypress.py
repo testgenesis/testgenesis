@@ -34,7 +34,7 @@ describe('{flow.name}', () => {{
         elif action.type == "form":
             if action.data:
                 for field, value in action.data.items():
-                    selector = f"{action.target} [name=\"{field}\"]"
+                    selector = f'{action.target} [name="{field}"]'
                     code += f"    cy.get('{selector}').type('{value}');\n"
             code += f"    cy.get('{action.target}').click();\n"
             if action.assertions:

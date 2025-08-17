@@ -57,7 +57,7 @@ def extract_user_flows(
     end_date: datetime,
     min_frequency: int = 5,
     output_dir: Path | None = None,
-    region: str = "eu"
+    region: str = "eu",
 ) -> list[TestFlow]:
     """Extract common user flows from Amplitude analytics using the Export API."""
     # Format dates for Amplitude Export API (YYYYMMDDTHH format)
@@ -76,16 +76,20 @@ def extract_user_flows(
         endpoint,
         params={"start": start_str, "end": end_str},
         auth=(api_key, secret_key),
-        stream=True
+        stream=True,
     )
 
     # Check for errors
     if response.status_code == 404:
         raise ValueError("No data available for the time range requested.")
     elif response.status_code == 400:
-        raise ValueError("The file size of the exported data is too large. Try shortening the time range.")
+        raise ValueError(
+            "The file size of the exported data is too large. Try shortening the time range."
+        )
     elif response.status_code == 403:
-        raise ValueError("Authorization failed. Check your API key, secret key, and ensure you're using the correct region (EU or standard).")
+        raise ValueError(
+            "Authorization failed. Check your API key, secret key, and ensure you're using the correct region (EU or standard)."
+        )
     elif response.status_code == 504:
         raise ValueError("The amount of data is large causing a timeout. Use a shorter time range.")
     elif response.status_code != 200:
@@ -98,7 +102,7 @@ def extract_user_flows(
 
         for file_name in file_list:
             # Check if the file is a gzip file by name
-            is_gzip_by_name = file_name.endswith('.gz')
+            is_gzip_by_name = file_name.endswith(".gz")
 
             with zip_file.open(file_name) as file:
                 try:
@@ -108,7 +112,9 @@ def extract_user_flows(
                         file_content = file.read()
 
                         # Process based on whether it's a gzip file by name or content
-                        if is_gzip_by_name or file_content.startswith(b'\x1f\x8b'):  # gzip magic number
+                        if is_gzip_by_name or file_content.startswith(
+                            b"\x1f\x8b"
+                        ):  # gzip magic number
                             # Decompress gzip content
                             with io.BytesIO(file_content) as compressed_stream:
                                 with gzip.GzipFile(fileobj=compressed_stream) as gzip_stream:
@@ -124,7 +130,7 @@ def extract_user_flows(
                     for line in lines:
                         if isinstance(line, bytes):
                             try:
-                                line = line.decode('utf-8')
+                                line = line.decode("utf-8")
                             except UnicodeDecodeError:
                                 continue
                         if line.strip():  # Skip empty lines

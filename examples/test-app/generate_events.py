@@ -8,6 +8,7 @@ import requests
 
 BASE_URL = "http://localhost:8050"
 
+
 def simulate_user_journey():
     """Simulate a complete user journey through the app."""
     session = requests.Session()
@@ -58,6 +59,7 @@ def simulate_user_journey():
     print(f"\nUser journey completed at {datetime.now()}")
     print("Events should now be available in Amplitude")
 
+
 def simulate_error_flows():
     """Simulate flows that trigger errors."""
     session = requests.Session()
@@ -90,12 +92,13 @@ def simulate_error_flows():
 
     print(f"\nError flow simulation completed at {datetime.now()}")
 
+
 if __name__ == "__main__":
     # Run multiple user journeys to generate enough data
     for i in range(3):
-        print(f"\n{'='*50}")
-        print(f"SIMULATION RUN {i+1}/3")
-        print(f"{'='*50}")
+        print(f"\n{'=' * 50}")
+        print(f"SIMULATION RUN {i + 1}/3")
+        print(f"{'=' * 50}")
 
         simulate_user_journey()
 
@@ -106,9 +109,9 @@ if __name__ == "__main__":
             print("\nWaiting 5 seconds before next simulation...")
             time.sleep(5)
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print("ALL SIMULATIONS COMPLETE")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
     print("\nYou can now use the TestGenesis CLI to extract flows from Amplitude")
     print("Example command:")
     print("  testgenesis amplitude extract-flows \\")

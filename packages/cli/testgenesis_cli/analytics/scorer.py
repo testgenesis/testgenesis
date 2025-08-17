@@ -9,26 +9,18 @@ import yaml
 
 def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
     """Generate a default configuration based on flow data.
-    
+
     Args:
         flows_dir: Optional directory containing flow files to analyze.
                   If provided, will scan flows to determine pages and weights.
-    
+
     Returns:
         Dict containing the default configuration.
     """
     if not flows_dir:
         return {
-            "weights": {
-                "error_weight": 2.0,
-                "business_weight": 1.5
-            },
-            "business_impact": {
-                "default": 2,
-                "login": 5,
-                "checkout": 4,
-                "profile": 3
-            },
+            "weights": {"error_weight": 2.0, "business_weight": 1.5},
+            "business_impact": {"default": 2, "login": 5, "checkout": 4, "profile": 3},
             "error_categories": {
                 "expected_errors": {
                     "login_error": {
@@ -38,14 +30,14 @@ def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
                             {
                                 "property": "error_code",
                                 "value": "invalid_credentials",
-                                "description": "User provided incorrect credentials"
+                                "description": "User provided incorrect credentials",
                             },
                             {
                                 "property": "error_code",
                                 "value": "user_not_found",
-                                "description": "User account does not exist"
-                            }
-                        ]
+                                "description": "User account does not exist",
+                            },
+                        ],
                     },
                     "validation_error": {
                         "weight": 0.5,
@@ -54,10 +46,10 @@ def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
                             {
                                 "property": "error_type",
                                 "value": "validation",
-                                "description": "Form field validation failed"
+                                "description": "Form field validation failed",
                             }
-                        ]
-                    }
+                        ],
+                    },
                 },
                 "unexpected_errors": {
                     "login_error": {
@@ -67,14 +59,14 @@ def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
                             {
                                 "property": "error_code",
                                 "value": "auth_service_error",
-                                "description": "Authentication service unavailable"
+                                "description": "Authentication service unavailable",
                             },
                             {
                                 "property": "error_code",
                                 "value": "database_error",
-                                "description": "Database connection error during authentication"
-                            }
-                        ]
+                                "description": "Database connection error during authentication",
+                            },
+                        ],
                     },
                     "server_error": {
                         "weight": 2.0,
@@ -83,9 +75,9 @@ def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
                             {
                                 "property": "status_code",
                                 "value": 500,
-                                "description": "Internal server error"
+                                "description": "Internal server error",
                             }
-                        ]
+                        ],
                     },
                     "network_error": {
                         "weight": 2.0,
@@ -94,12 +86,12 @@ def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
                             {
                                 "property": "error_type",
                                 "value": "network",
-                                "description": "Network connection failed"
+                                "description": "Network connection failed",
                             }
-                        ]
-                    }
-                }
-            }
+                        ],
+                    },
+                },
+            },
         }
 
     # Scan flows to find unique pages and error patterns
@@ -153,42 +145,39 @@ def get_default_config(flows_dir: str | None = None) -> dict[str, Any]:
         "dashboard": 3,
         "admin": 5,
         "api": 4,
-        "auth": 5
+        "auth": 5,
     }
 
     # Add impact for found pages
     for page in pages:
-        page_name = page.split('/')[-1].lower()
+        page_name = page.split("/")[-1].lower()
         if page_name in critical_pages:
             business_impact[page_name] = critical_pages[page_name]
 
     # Generate error categories based on found error types
-    error_categories = {
-        "expected_errors": {},
-        "unexpected_errors": {}
-    }
+    error_categories = {"expected_errors": {}, "unexpected_errors": {}}
 
     # Categorize found error types
     for error_type in error_types:
         error_type_lower = error_type.lower()
-        if any(expected in error_type_lower for expected in ["validation", "invalid", "not_found", "unauthorized"]):
+        if any(
+            expected in error_type_lower
+            for expected in ["validation", "invalid", "not_found", "unauthorized"]
+        ):
             error_categories["expected_errors"][error_type] = {
                 "weight": 0.5,
-                "description": f"Expected error: {error_type}"
+                "description": f"Expected error: {error_type}",
             }
         else:
             error_categories["unexpected_errors"][error_type] = {
                 "weight": 2.0,
-                "description": f"Unexpected error: {error_type}"
+                "description": f"Unexpected error: {error_type}",
             }
 
     return {
-        "weights": {
-            "error_weight": error_weight,
-            "business_weight": business_weight
-        },
+        "weights": {"error_weight": error_weight, "business_weight": business_weight},
         "business_impact": business_impact,
-        "error_categories": error_categories
+        "error_categories": error_categories,
     }
 
 
@@ -197,7 +186,7 @@ class FlowScorer:
 
     def __init__(self, config_path_or_dict: str | dict[str, Any], flows_dir: str | None = None):
         """Initialize the scorer with configuration.
-        
+
         Args:
             config_path_or_dict: Path to YAML config file or dict with config data.
             flows_dir: Optional directory containing flow files to analyze.
@@ -210,7 +199,7 @@ class FlowScorer:
                 config_data = get_default_config(flows_dir)
                 # Ensure parent directory exists
                 config_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(config_path, 'w') as f:
+                with open(config_path, "w") as f:
                     yaml.dump(config_data, f, default_flow_style=False)
                 print(f"Created default configuration at {config_path}")
                 print("Please edit the configuration file to customize weights and impact values.")
@@ -226,22 +215,22 @@ class FlowScorer:
 
     def get_business_impact(self, page_url: str) -> float:
         """Get business impact score for a page.
-        
+
         Args:
             page_url: URL of the page
-            
+
         Returns:
             Business impact score for the page
         """
-        page_name = page_url.split('/')[-1].lower()
+        page_name = page_url.split("/")[-1].lower()
         return self.business_impact.get(page_name, self.business_impact["default"])
 
     def calculate_score(self, flow: dict[str, Any]) -> dict[str, Any]:
         """Calculate score for a flow.
-        
+
         Args:
             flow: Dictionary containing flow data with frequency and actions
-            
+
         Returns:
             Dictionary containing score and component values
         """
@@ -266,7 +255,7 @@ class FlowScorer:
                     "error_code": error_data.get("error_code", "No code"),
                     "error_type": error_data.get("error_type", "No type"),
                     "page": error_data.get("[Amplitude] Page URL", "Unknown page"),
-                    "timestamp": error_data.get("timestamp", "Unknown time")
+                    "timestamp": error_data.get("timestamp", "Unknown time"),
                 }
 
                 # Function to check if error matches conditions
@@ -279,7 +268,9 @@ class FlowScorer:
                         actual_value = error_data.get(property_name)
 
                         # Handle numeric values
-                        if isinstance(expected_value, (int, float)) and isinstance(actual_value, str):
+                        if isinstance(expected_value, (int, float)) and isinstance(
+                            actual_value, str
+                        ):
                             try:
                                 actual_value = float(actual_value)
                             except ValueError:
@@ -291,36 +282,48 @@ class FlowScorer:
 
                 # Check expected errors first
                 for category, error_config in error_categories.get("expected_errors", {}).items():
-                    if error_type == category and matches_conditions(error_config.get("conditions", [])):
+                    if error_type == category and matches_conditions(
+                        error_config.get("conditions", [])
+                    ):
                         expected_error_count += 1
-                        error_details.append({
-                            **error_info,
-                            "category": "expected",
-                            "weight": 0,  # Expected errors don't affect score
-                            "description": error_config["description"]
-                        })
+                        error_details.append(
+                            {
+                                **error_info,
+                                "category": "expected",
+                                "weight": 0,  # Expected errors don't affect score
+                                "description": error_config["description"],
+                            }
+                        )
                         break
                 else:
                     # Check unexpected errors
-                    for category, error_config in error_categories.get("unexpected_errors", {}).items():
-                        if error_type == category and matches_conditions(error_config.get("conditions", [])):
+                    for category, error_config in error_categories.get(
+                        "unexpected_errors", {}
+                    ).items():
+                        if error_type == category and matches_conditions(
+                            error_config.get("conditions", [])
+                        ):
                             unexpected_error_count += 1
-                            error_details.append({
-                                **error_info,
-                                "category": "unexpected",
-                                "weight": error_config["weight"],
-                                "description": error_config["description"]
-                            })
+                            error_details.append(
+                                {
+                                    **error_info,
+                                    "category": "unexpected",
+                                    "weight": error_config["weight"],
+                                    "description": error_config["description"],
+                                }
+                            )
                             break
                     else:
                         # Default to unexpected if not categorized
                         unexpected_error_count += 1
-                        error_details.append({
-                            **error_info,
-                            "category": "unexpected",
-                            "weight": 2.0,
-                            "description": f"Uncategorized error: {error_type}"
-                        })
+                        error_details.append(
+                            {
+                                **error_info,
+                                "category": "unexpected",
+                                "weight": 2.0,
+                                "description": f"Uncategorized error: {error_type}",
+                            }
+                        )
 
         # Get business impact from first page view
         business_impact = 0
@@ -331,11 +334,13 @@ class FlowScorer:
                 break
 
         # Calculate total score with only unexpected errors
-        error_score = sum(error["weight"] for error in error_details if error["category"] == "unexpected")
+        error_score = sum(
+            error["weight"] for error in error_details if error["category"] == "unexpected"
+        )
         score = (
-            frequency +
-            (error_score * self.weights["error_weight"]) +
-            (business_impact * self.weights["business_weight"])
+            frequency
+            + (error_score * self.weights["error_weight"])
+            + (business_impact * self.weights["business_weight"])
         )
 
         return {
@@ -344,12 +349,11 @@ class FlowScorer:
             "expected_error_count": expected_error_count,
             "unexpected_error_count": unexpected_error_count,
             "error_details": error_details,
-            "business_impact": business_impact
+            "business_impact": business_impact,
         }
 
 
 def save_config(config: dict, config_path: str) -> None:
     """Save configuration to YAML file."""
-    with open(config_path, 'w') as f:
+    with open(config_path, "w") as f:
         yaml.dump(config, f, default_flow_style=False)
-

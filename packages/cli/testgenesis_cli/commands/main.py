@@ -1,6 +1,5 @@
 """TestGenesis CLI main entry point."""
 
-
 import click
 
 from testgenesis_cli.analytics.amplitude import amplitude

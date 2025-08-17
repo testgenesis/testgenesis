@@ -44,19 +44,20 @@ class TestAppManager:
                 cwd=self.app_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=env
+                env=env,
             )
 
             # Wait for the app to start
             for i in range(timeout):
                 try:
                     import requests
+
                     response = requests.get(f"{self.base_url}/", timeout=2)
-                    print(f"Got response {response.status_code} on attempt {i+1}")
+                    print(f"Got response {response.status_code} on attempt {i + 1}")
                     if response.status_code in [200, 404]:  # 404 is OK, means server is up
                         return True
                 except requests.exceptions.RequestException as e:
-                    print(f"Connection attempt {i+1} failed: {e}")
+                    print(f"Connection attempt {i + 1} failed: {e}")
                     pass
 
                 # Check if process is still running
@@ -100,18 +101,18 @@ class PlaywrightTestRunner:
                 cwd=self.test_dir,
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=120,
             )
             if result.returncode != 0:
                 return False
-            
+
             # Install browsers using Python playwright
             result = subprocess.run(
                 ["uv", "run", "playwright", "install", "chromium"],
                 cwd=self.test_dir,
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=120,
             )
             return result.returncode == 0
         except Exception:
@@ -126,7 +127,7 @@ class PlaywrightTestRunner:
                 cwd=self.test_dir,
                 capture_output=True,
                 text=True,
-                timeout=timeout
+                timeout=timeout,
             )
 
             # Parse results from Python test execution
@@ -137,7 +138,7 @@ class PlaywrightTestRunner:
                 "stderr": result.stderr,
                 "tests_passed": 0,
                 "tests_failed": 0,
-                "tests_total": 1  # Always 1 test since we run a single Python function
+                "tests_total": 1,  # Always 1 test since we run a single Python function
             }
 
             # Determine test results based on return code and output
@@ -163,7 +164,7 @@ class PlaywrightTestRunner:
                 "stderr": "Test execution timed out",
                 "tests_passed": 0,
                 "tests_failed": 1,
-                "tests_total": 1
+                "tests_total": 1,
             }
         except Exception as e:
             return {
@@ -173,7 +174,7 @@ class PlaywrightTestRunner:
                 "stderr": f"Test execution error: {e!s}",
                 "tests_passed": 0,
                 "tests_failed": 1,
-                "tests_total": 1
+                "tests_total": 1,
             }
 
 
@@ -233,9 +234,9 @@ async def test_true_e2e_workflow_execution(test_app_dir, real_amplitude_flows):
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
-            
+
             if init_result.returncode != 0:
                 pytest.skip("Could not initialize project")
 
@@ -246,7 +247,7 @@ async def test_true_e2e_workflow_execution(test_app_dir, real_amplitude_flows):
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=120,
             )
 
             if install_result.returncode != 0:
@@ -325,7 +326,9 @@ if __name__ == "__main__":
             assert "timeout" not in result["stderr"].lower(), "Test should not timeout"
 
             # Check that the test executed properly
-            assert result["returncode"] in [0, 1], "Test should execute and return a valid exit code"
+            assert result["returncode"] in [0, 1], (
+                "Test should execute and return a valid exit code"
+            )
 
             print("✅ True E2E test execution completed successfully!")
 
@@ -395,15 +398,15 @@ if __name__ == "__main__":
     asyncio.run(simple_navigation_test())
 '''
 
-            # Initialize project and install Playwright  
+            # Initialize project and install Playwright
             init_result = subprocess.run(
                 ["uv", "init", "--no-readme"],
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
-            
+
             if init_result.returncode != 0:
                 pytest.skip("Could not initialize project")
 
@@ -413,7 +416,7 @@ if __name__ == "__main__":
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=120,
             )
 
             if install_result.returncode != 0:
@@ -458,19 +461,19 @@ async def test_playwright_installation():
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
-            
+
             if init_result.returncode != 0:
                 pytest.skip("Could not initialize project")
-            
+
             # Add playwright dependency
             result = subprocess.run(
                 ["uv", "add", "playwright"],
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=120,
             )
 
             print(f"uv add result: {result.returncode}")
@@ -482,13 +485,19 @@ async def test_playwright_installation():
 
             # Check that playwright was installed by trying to import it
             import_result = subprocess.run(
-                ["uv", "run", "python", "-c", "import playwright; print('Playwright imported successfully')"],
+                [
+                    "uv",
+                    "run",
+                    "python",
+                    "-c",
+                    "import playwright; print('Playwright imported successfully')",
+                ],
                 cwd=temp_path,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
-            
+
             assert import_result.returncode == 0, "Should be able to import playwright"
             assert "Playwright imported successfully" in import_result.stdout
 

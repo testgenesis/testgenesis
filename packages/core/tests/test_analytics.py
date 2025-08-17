@@ -31,7 +31,7 @@ def mock_amplitude_events():
         "session_id": "session1",
         "event_type": "navigation",
         "event_properties": {"path": "/login"},
-        "client_event_time": "2024-03-01T12:00:00.000Z"
+        "client_event_time": "2024-03-01T12:00:00.000Z",
     }
 
     event2 = {
@@ -40,9 +40,9 @@ def mock_amplitude_events():
         "event_type": "form",
         "event_properties": {
             "target": "#login-form",
-            "data": {"username": "testuser", "password": "password123"}
+            "data": {"username": "testuser", "password": "password123"},
         },
-        "client_event_time": "2024-03-01T12:01:00.000Z"
+        "client_event_time": "2024-03-01T12:01:00.000Z",
     }
 
     return [event1, event2]
@@ -124,7 +124,7 @@ def test_extract_user_flows(mock_requests_get, tmp_path, mock_amplitude_response
         end_date=end_date,
         min_frequency=1,
         output_dir=output_dir,
-        region="eu"
+        region="eu",
     )
 
     # Verify the API call
@@ -167,7 +167,7 @@ def test_extract_user_flows_standard_region(mock_requests_get, tmp_path, mock_am
         end_date=end_date,
         min_frequency=1,
         output_dir=output_dir,
-        region="standard"
+        region="standard",
     )
 
     # Verify the API call uses the standard endpoint
@@ -194,7 +194,7 @@ def test_extract_user_flows_api_errors(mock_requests_get, tmp_path):
             secret_key="test-secret",
             start_date=datetime(2024, 3, 1),
             end_date=datetime(2024, 3, 31),
-            output_dir=tmp_path
+            output_dir=tmp_path,
         )
 
     # Test 403 error
@@ -205,7 +205,7 @@ def test_extract_user_flows_api_errors(mock_requests_get, tmp_path):
             secret_key="test-secret",
             start_date=datetime(2024, 3, 1),
             end_date=datetime(2024, 3, 31),
-            output_dir=tmp_path
+            output_dir=tmp_path,
         )
 
     # Test 504 error
@@ -216,7 +216,7 @@ def test_extract_user_flows_api_errors(mock_requests_get, tmp_path):
             secret_key="test-secret",
             start_date=datetime(2024, 3, 1),
             end_date=datetime(2024, 3, 31),
-            output_dir=tmp_path
+            output_dir=tmp_path,
         )
 
 
@@ -248,7 +248,7 @@ def test_extract_user_flows_with_gzipped_file(mock_requests_get, tmp_path, mock_
         start_date=datetime(2024, 3, 1),
         end_date=datetime(2024, 3, 31),
         min_frequency=1,
-        output_dir=tmp_path
+        output_dir=tmp_path,
     )
 
     # Verify the results
@@ -267,7 +267,9 @@ def test_extract_user_flows_with_gzipped_file(mock_requests_get, tmp_path, mock_
 
 
 @patch("testgenesis_core.analytics.amplitude.requests.get")
-def test_extract_flows_with_gzip_content_no_extension(mock_requests_get, tmp_path, mock_amplitude_events):
+def test_extract_flows_with_gzip_content_no_extension(
+    mock_requests_get, tmp_path, mock_amplitude_events
+):
     """Test extracting flows from Amplitude with gzipped content but no .gz extension."""
     # Create a mock ZIP file with gzipped Amplitude data but without .gz extension
     zip_buffer = io.BytesIO()
@@ -294,7 +296,7 @@ def test_extract_flows_with_gzip_content_no_extension(mock_requests_get, tmp_pat
         start_date=datetime(2024, 3, 1),
         end_date=datetime(2024, 3, 31),
         min_frequency=1,
-        output_dir=tmp_path
+        output_dir=tmp_path,
     )
 
     # Verify the results
@@ -330,7 +332,7 @@ def test_extract_user_flows_with_corrupted_gz(mock_requests_get, tmp_path):
         secret_key="test-secret",
         start_date=datetime(2024, 3, 1),
         end_date=datetime(2024, 3, 31),
-        output_dir=tmp_path
+        output_dir=tmp_path,
     )
 
     assert len(flows) == 0
@@ -354,7 +356,7 @@ def test_extract_user_flows_with_encoding_errors(mock_requests_get, tmp_path):
         secret_key="test-secret",
         start_date=datetime(2024, 3, 1),
         end_date=datetime(2024, 3, 31),
-        output_dir=tmp_path
+        output_dir=tmp_path,
     )
 
     assert len(flows) == 0
@@ -375,11 +377,7 @@ def test_flow_scorer_load_config(config_file):
 def test_flow_scorer_calculate_score(tmp_path):
     """Test calculating score for a flow."""
     # Create test config
-    config = {
-        "weights": {
-            "error_weight": 2.0
-        }
-    }
+    config = {"weights": {"error_weight": 2.0}}
 
     config_path = tmp_path / "config.yaml"
     save_config(config, str(config_path))
@@ -391,19 +389,9 @@ def test_flow_scorer_calculate_score(tmp_path):
     flow = {
         "frequency": 10,
         "actions": [
-            {
-                "type": "[Amplitude] Page Viewed",
-                "data": {
-                    "[Amplitude] Page URL": "/login"
-                }
-            },
-            {
-                "type": "error",
-                "data": {
-                    "message": "Invalid credentials"
-                }
-            }
-        ]
+            {"type": "[Amplitude] Page Viewed", "data": {"[Amplitude] Page URL": "/login"}},
+            {"type": "error", "data": {"message": "Invalid credentials"}},
+        ],
     }
 
     result = scorer.calculate_score(flow)
@@ -413,24 +401,34 @@ def test_flow_scorer_calculate_score(tmp_path):
 
 
 @given(
-    flow=st.fixed_dictionaries({
-        "frequency": st.integers(min_value=0),
-        "actions": st.lists(
-            st.fixed_dictionaries({
-                "type": st.sampled_from(["[Amplitude] Page Viewed", "error", "form"]),
-                "data": st.fixed_dictionaries({
-                    "[Amplitude] Page URL": st.sampled_from(["/login", "/checkout", "/profile"]),
-                    "message": st.just("Test error")
-                })
-            }),
-            min_size=1
-        )
-    }),
-    config=st.fixed_dictionaries({
-        "weights": st.fixed_dictionaries({
-            "error_weight": st.floats(min_value=0.1, max_value=5.0)
-        })
-    })
+    flow=st.fixed_dictionaries(
+        {
+            "frequency": st.integers(min_value=0),
+            "actions": st.lists(
+                st.fixed_dictionaries(
+                    {
+                        "type": st.sampled_from(["[Amplitude] Page Viewed", "error", "form"]),
+                        "data": st.fixed_dictionaries(
+                            {
+                                "[Amplitude] Page URL": st.sampled_from(
+                                    ["/login", "/checkout", "/profile"]
+                                ),
+                                "message": st.just("Test error"),
+                            }
+                        ),
+                    }
+                ),
+                min_size=1,
+            ),
+        }
+    ),
+    config=st.fixed_dictionaries(
+        {
+            "weights": st.fixed_dictionaries(
+                {"error_weight": st.floats(min_value=0.1, max_value=5.0)}
+            )
+        }
+    ),
 )
 @settings(max_examples=10)
 def test_flow_scorer_properties(flow, config):
@@ -445,6 +443,7 @@ def test_flow_scorer_properties(flow, config):
     assert result["frequency"] == flow["frequency"]
     assert result["error_count"] == sum(1 for a in flow["actions"] if a["type"] == "error")
 
+
 @given(
     data=st.data(),
 )
@@ -452,11 +451,7 @@ def test_flow_scorer_properties(flow, config):
 def test_flow_scorer_edge_cases(data):
     """Test flow scorer with edge cases."""
     # Generate random config
-    config = {
-        "weights": {
-            "error_weight": data.draw(st.floats(min_value=0.1, max_value=5.0))
-        }
-    }
+    config = {"weights": {"error_weight": data.draw(st.floats(min_value=0.1, max_value=5.0))}}
 
     scorer = FlowScorer(config)
 
@@ -467,10 +462,7 @@ def test_flow_scorer_edge_cases(data):
     assert result["error_count"] == 0
 
     # Test flow with errors
-    error_flow = {
-        "frequency": 1,
-        "actions": [{"type": "error", "data": {"message": "Test"}}]
-    }
+    error_flow = {"frequency": 1, "actions": [{"type": "error", "data": {"message": "Test"}}]}
     result = scorer.calculate_score(error_flow)
     assert result["error_count"] == 1
     assert result["score"] == 1 + (1 * config["weights"]["error_weight"])
@@ -485,18 +477,8 @@ def test_flow_scorer_config_generation(tmp_path):
     # Create a flow with login page and error
     flow_data = {
         "actions": [
-            {
-                "type": "[Amplitude] Page Viewed",
-                "data": {
-                    "[Amplitude] Page URL": "/login"
-                }
-            },
-            {
-                "type": "error",
-                "data": {
-                    "message": "Invalid credentials"
-                }
-            }
+            {"type": "[Amplitude] Page Viewed", "data": {"[Amplitude] Page URL": "/login"}},
+            {"type": "error", "data": {"message": "Invalid credentials"}},
         ]
     }
 

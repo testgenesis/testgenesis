@@ -11,25 +11,17 @@ from playwright.async_api import async_playwright
 
 async def generate_page_views():
     """Generate page view events by visiting different pages."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Simple Amplitude Event Generator")
     print(f"Starting at: {datetime.now()}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
 
         # List of pages to visit
-        pages = [
-            "/",
-            "/login",
-            "/store",
-            "/cart",
-            "/profile",
-            "/checkout",
-            "/register"
-        ]
+        pages = ["/", "/login", "/store", "/cart", "/profile", "/checkout", "/register"]
 
         base_url = "http://localhost:8050"
 
@@ -51,10 +43,10 @@ async def generate_page_views():
 
         await browser.close()
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Event generation complete!")
     print(f"Ended at: {datetime.now()}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 """Test generation command."""
 
-
 import click
 from rich.console import Console
 

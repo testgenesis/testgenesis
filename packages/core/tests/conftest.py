@@ -16,16 +16,8 @@ def test_data_dir():
 def config_file(tmp_path):
     """Create a test configuration file."""
     config = {
-        "weights": {
-            "error_weight": 2.0,
-            "business_weight": 1.5
-        },
-        "business_criticality": {
-            "default": 2,
-            "login": 5,
-            "checkout": 4,
-            "profile": 3
-        }
+        "weights": {"error_weight": 2.0, "business_weight": 1.5},
+        "business_criticality": {"default": 2, "login": 5, "checkout": 4, "profile": 3},
     }
 
     config_path = tmp_path / "test_config.yaml"
